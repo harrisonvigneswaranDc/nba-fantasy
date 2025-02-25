@@ -1,0 +1,95 @@
+/* LeaguePage.css
+   Styles for the "Player Dashboard - League" layout.
+   Uses a blue-green color palette with a "card" style for Standings & Chat.
+*/
+
+.league-page {
+    font-family: Arial, sans-serif;
+    background-color: #f7fafc; /* light grayish-blue */
+    min-height: 100vh;
+    padding: 1rem;
+  }
+  
+  /* League Header */
+  .league-header {
+    background-color: #3b82f6; /* bright blue */
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  .league-title {
+    margin: 0;
+  }
+  
+  /* Info Box for Commissioner & Member count */
+  .league-info-box {
+    background-color: #f0fdf4; /* light green background */
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Main Flex Container: Standings & Chat side by side */
+  .league-main-section {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap; /* wrap if screen is smaller */
+  }
+  
+  /* Reusable "card" style */
+  .card {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    flex: 1;
+    padding: 1rem;
+    min-width: 300px; /* so it doesn't get too narrow on small screens */
+  }
+  
+ 
+  .standings-table td {
+    padding: 0.25rem 0;
+  }
+  
+
+  
+  .chat-window {
+    background-color: #f1f5f9; 
+    height: 200px;            /* fixed height for example */
+    overflow-y: auto;         /* scroll if messages exceed height */
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    padding: 0.5rem;
+  }
+  
+  .chat-window p {
+    margin: 0.25rem 0;
+  }
+  
+  .chat-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .chat-input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+  }
+  
+  .send-btn {
+    background-color: #10b981; 
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .send-btn:hover {
+    background-color: #0f9f75;
+  }
+  

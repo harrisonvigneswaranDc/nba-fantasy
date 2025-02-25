@@ -1,0 +1,165 @@
+/* FreeAgents.css */
+
+/* main container */
+.free-agents-page {
+    font-family: Arial, sans-serif;
+    background-color: #f7fafc; /* light grayish-blue */
+    min-height: 100vh;
+    padding: 1rem;
+  }
+  
+  /* header / top bar */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #3b82f6; /* bright blue */
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  
+  .top-bar-left h2 {
+    margin: 0;
+  }
+  
+  .top-bar-right {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .logout-btn {
+    background-color: #10b981; /* green */
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .logout-btn:hover {
+    background-color: #0f9f75;
+  }
+  
+  /* search / filters row */
+  .filters-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .search-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .select-filter,
+  .select-sort {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .refresh-btn {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .refresh-btn:hover {
+    background-color: #2563eb;
+  }
+  
+  /* table container */
+  .free-agents-table-container {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* table styling */
+  .free-agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+  }
+  
+  .free-agents-table th,
+  .free-agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: left;
+  }
+  
+  .free-agents-table thead th {
+    background-color: #f1f5f9;
+    font-weight: bold;
+  }
+  
+  .free-agents-table tbody tr:hover {
+    background-color: #f7fafc;
+  }
+  
+  /* add button */
+  .add-btn {
+    background: #10b981; 
+    border: none;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .add-btn:hover {
+    background: #0f9f75;
+  }
+  
+  /* table footer / pagination */
+  .table-footer {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 0.5rem 0;
+  }
+  
+  .nav-btn {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .nav-btn:hover {
+    background-color: #2563eb;
+  }
+  
+  /* disclaimer / rules box */
+  .disclaimer-box {
+    background-color: #f0fdf4; /* light green */
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  
+  .disclaimer-box p {
+    margin: 0.5rem 0;
+    font-weight: bold;
+  }
+  
+  .disclaimer-box ul {
+    list-style: disc;
+    margin-left: 1.5rem;
+  }
+  
+  .disclaimer-box li {
+    margin: 0.25rem 0;
+  }
+  

@@ -1,0 +1,136 @@
+/* PlayerDashboard.css */
+
+/* Overall page/container */
+.player-dashboard-page {
+  background-color: #f0f8fb; /* a very light blue background */
+  min-height: 100vh;
+  padding: 1rem;
+  font-family: Arial, sans-serif;
+}
+
+/* Header / Top Bar */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #3b82f6; /* bright blue */
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+.dashboard-header .header-left,
+.dashboard-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logout-button {
+  background-color: #10b981;
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.logout-button:hover {
+  background-color: #0f9f75;
+}
+
+/* Main Title (PLAYER DASHBOARD) */
+.dashboard-title {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+/* Info & Score Section */
+.info-score-section {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Reusable card style */
+.card {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  flex: 1; /* so the user/team box & scoreboard box fill row equally */
+}
+
+/* Specific tweaks for the user/team info box */
+.user-team-info-box {
+  background-color: #f0fdf4; /* light green background */
+}
+
+/* Scoreboard box */
+.team-score-box {
+  background-color: #f0f8fb; /* lighter blue tint for scoreboard area */
+}
+
+/* Quick Links Container 
+   Force all link cards onto a single row by using flex-wrap: nowrap
+   and a fixed width for each card.
+*/
+.quick-links-container {
+  display: flex;
+  flex-wrap: nowrap; /* keep them on a single row */
+  gap: 1rem;
+  margin-bottom: 1rem;
+  overflow-x: auto; /* horizontal scroll if container is too narrow */
+  justify-content: center; /* center the cards in the container */
+}
+
+/* Each link card forced to a fixed width so they line up on one row */
+.quick-link-card {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  /* fix width so you can display exactly 5 in a row, e.g. 200px each */
+  width: 200px;
+  text-align: center;
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex: 0 0 auto; /* do not shrink or grow beyond 200px */
+}
+.quick-link-card:hover {
+  background-color: #e6f2ff;
+}
+.quick-link-card h3 {
+  margin-bottom: 0.5rem;
+  color: #3b82f6; /* highlight in bright blue */
+}
+
+/* Additional info or real-time updates */
+.updates-section {
+  background-color: #f0fdf4;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+.updates-section h4 {
+  margin-bottom: 0.5rem;
+  color: #10b981;
+}
+.updates-section ul {
+  list-style: none;
+  padding-left: 0;
+}
+.updates-section li {
+  margin: 0.25rem 0;
+}
+
+/* Utility margin classes (optional) */
+.mt-2 {
+  margin-top: 2rem;
+}
+.mb-2 {
+  margin-bottom: 2rem;
+}
+

@@ -1,0 +1,192 @@
+/* PlayerTradeMachine.css
+   Modified to show each player's row as a "card" you can click.
+*/
+
+.trade-machine-page {
+  font-family: Arial, sans-serif;
+  background-color: #f7fafc;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* Header */
+.trade-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #3b82f6; /* bright blue */
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.trade-header h2 {
+  margin: 0;
+}
+
+.trade-tabs-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.tab-item {
+  background-color: #e6f2ff;
+  border: 1px solid #ccc;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Section titles */
+.section-title {
+  font-weight: bold;
+  margin: 1rem 0 0.5rem;
+}
+
+/* Table container for incoming/outgoing trades */
+.table-container {
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+/* Basic table style */
+.trade-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+  font-size: 0.9rem;
+}
+
+.trade-table thead th {
+  background-color: #f1f5f9;
+  font-weight: bold;
+}
+
+.trade-table th,
+.trade-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+}
+
+.trade-table tbody tr:hover {
+  background-color: #f7fafc;
+}
+
+/* Propose New Trade Container */
+.propose-trade-container {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+/* The row with (1) Season etc. */
+.propose-trade-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+/* Panels for each team */
+.trade-panels {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.trade-panel {
+  background-color: #f7fafc;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  flex: 1;
+  min-width: 300px;
+  padding: 1rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.panel-info {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Replaces the old UL list with card-based approach */
+.player-cards {
+  margin-top: 1rem;
+}
+
+.player-cards h4 {
+  margin-bottom: 0.5rem;
+}
+
+.player-card {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.player-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 70%;
+}
+
+.add-trade-btn {
+  background-color: #3b82f6; /* blue button */
+  color: white;
+  border: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.add-trade-btn:hover {
+  background-color: #2563eb;
+}
+
+/* Trade Summary area */
+.trade-summary {
+  background-color: #f0fdf4; /* light green */
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.validate-btn {
+  background-color: #10b981;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.validate-btn:hover {
+  background-color: #0f9f75;
+}
+
+.trade-result-placeholder {
+  color: #666;
+  font-style: italic;
+  margin-top: 0.5rem;
+}

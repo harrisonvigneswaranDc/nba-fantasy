@@ -1,0 +1,113 @@
+.matchup-page {
+  font-family: Arial, sans-serif;
+  background-color: #f7fafc; /* light background */
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* Top bar for logo / logout */
+.matchup-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #3b82f6; /* bright blue */
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+/* Team Header (left, vs-score, right) */
+.team-header-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.team-header-left,
+.team-header-right {
+  text-align: center;
+}
+
+.vs-score {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #666;
+}
+
+/* Date navigation row */
+.date-nav {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.date-nav span {
+  font-weight: bold;
+}
+
+/* Container for the big table */
+.matchup-table-container {
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+/* The big table */
+.matchup-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* 12 columns for left side + 1 middle + 12 for right side = 25 total. 
+     We'll ensure enough width. */
+  min-width: 1000px;
+  font-size: 0.9rem;
+}
+
+.matchup-table th,
+.matchup-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+}
+
+.matchup-table thead th {
+  background-color: #f1f5f9; /* subtle grayish background for header */
+}
+
+/* Row hover effect */
+.matchup-table tbody tr:hover {
+  background-color: #f7fafc;
+}
+
+/* The middle column (divider) */
+.middle-col {
+  background-color: #f9fafb;
+  text-align: center;
+  font-weight: bold;
+  color: #666;
+  /* optionally: width: 1rem; to keep it narrow if you like */
+}
+
+/* Section label rows, e.g. "STARTERS", "BENCH", "DNP" */
+.section-label td {
+  background-color: #e6f2ff;
+  font-weight: bold;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+/* Round corners for the label row cells */
+.section-label td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.section-label td:last-child {
+  border-radius: 0 8px 8px 0;
+}
