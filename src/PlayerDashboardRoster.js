@@ -1,21 +1,15 @@
 import React from "react";
 import "./PlayerDashboardRoster.css";
+import Header from "./Header";
+
 
 function PlayerDashboardRoster() {
   return (
+    <div>
+      
+    
     <div className="roster-page">
-      {/* Header Row: ROSTER & SALARY CAP on the left, Injury Status & Moves + user info on right */}
-      <div className="roster-header">
-        <div className="header-left">
-          <h2>ROSTER & SALARY CAP</h2>
-        </div>
-        <div className="header-right">
-          <h2>INJURY STATUS & SUGGESTED MOVES</h2>
-          <div className="user-profile-logout">
-            [User Profile Icon / Logout]
-          </div>
-        </div>
-      </div>
+      <Header />
 
       <div className="content-row">
         {/* Left Column: Salary Cap Info + Roster */}
@@ -96,6 +90,7 @@ function PlayerDashboardRoster() {
         <button className="save-btn">Save Lineup</button>
         <button className="cancel-btn">Cancel</button>
       </div>
+    </div>
     </div>
   );
 }

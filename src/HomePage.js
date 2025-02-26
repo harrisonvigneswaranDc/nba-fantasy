@@ -1,20 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import "./HomePage.css";
+import Header from "./Header";
 
 function HomePage() {
   return (
+    <div>
+    
     <div className="home-page">
-      {/* Top Bar */}
-      <header className="top-bar">
-        <div className="left">
-          <h1>FANTASY BASKETBALL 2024</h1>
-        </div>
-        <div className="right">
-          <button className="login-btn">Login</button>
-          <button className="help-btn">Help</button>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Container */}
       <div className="main-content">
@@ -64,6 +58,7 @@ function HomePage() {
         <span>[Terms of Service]</span>
         <span>[Contact]</span>
       </footer>
+    </div>
     </div>
   );
 }

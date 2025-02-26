@@ -1,0 +1,35 @@
+.app-header {
+    background-color: #004080;
+    padding: 10px 20px;
+    color: #fff;
+  }
+  
+  .navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .nav-link {
+    color: #fff;
+    text-decoration: none;
+    margin-right: 15px;
+  }
+  
+  .nav-link:hover {
+    text-decoration: underline;
+  }
+  
+  .nav-button {
+    background-color: #ff6600;
+    border: none;
+    padding: 8px 12px;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .nav-button:hover {
+    background-color: #e65c00;
+  }
+  

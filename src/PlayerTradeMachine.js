@@ -1,14 +1,12 @@
 import React from "react";
 import "./PlayerTradeMachine.css";
-
+import Header from "./Header";
 export default function TradeMachine() {
   return (
+    <div>
+      
     <div className="trade-machine-page">
-      {/* Header Bar */}
-      <header className="trade-header">
-        <h2>TRADE MACHINE</h2>
-        <div className="user-profile-logout">[User Profile Icon / Logout]</div>
-      </header>
+      <Header />
 
 
       {/* Incoming Trades Table */}
@@ -207,6 +205,7 @@ export default function TradeMachine() {
           </p>
         </div>
       </div>
+    </div>
     </div>
   );
 }

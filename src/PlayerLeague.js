@@ -1,13 +1,13 @@
 import React from "react";
 import "./PlayerLeague.css";
+import Header from "./Header";
 
 function PlayerLeague() {
   return (
+    <div>
+      
     <div className="league-page">
-      {/* League Header */}
-      <div className="league-header">
-        <h2 className="league-title">[LEAGUE NAME] - My Points League</h2>
-      </div>
+      <Header />
 
       {/* Commissioner & Members Info */}
       <div className="league-info-box">
@@ -43,6 +43,7 @@ function PlayerLeague() {
         </div>
         </div>
       </div>
+    </div>
   );
 }
 

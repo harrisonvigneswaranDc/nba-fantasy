@@ -1,14 +1,15 @@
 import React from "react";
 import "./PlayerDashboardMatchup.css";
+import Header from "./Header";
 
 function PlayerDashboardMatchup() {
   return (
+    <div>
+      
+
+
     <div className="matchup-page">
-      {/* Example Top Bar */}
-      <div className="matchup-topbar">
-        <div className="left">[League/Platform Logo]</div>
-        <div className="right">[User Profile Icon / Logout]</div>
-      </div>
+      <Header />
 
       {/* Team Header Section */}
       <div className="team-header-section">
@@ -222,6 +223,7 @@ function PlayerDashboardMatchup() {
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   );
 }

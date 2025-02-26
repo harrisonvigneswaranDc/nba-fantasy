@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./FreeAgents.css";
+import Header from "./Header";
 
 function FreeAgents() {
   const [players, setPlayers] = useState([]);
@@ -93,7 +94,12 @@ function FreeAgents() {
 
 
   return (
+    <div>
+      
+
     <div className="free-agents-page">
+      <Header />
+
       {/* Header / Top Bar */}
       <header className="top-bar">
         <div className="top-bar-left">
@@ -197,6 +203,7 @@ function FreeAgents() {
           <li>- If any rules (e.g. salary cap) are violated, show a “Warning” prompt.</li>
         </ul>
       </div>
+    </div>
     </div>
   );
 }

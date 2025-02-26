@@ -1,20 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import "./PlayerDashboard.css"; // <-- reference the CSS file
+import Header from "./Header";
 
 function PlayerDashboard() {
   return (
+    <div>
+      
     <div className="player-dashboard-page">
-      <div className="dashboard-header">
-        <div className="header-left">
-          <div>[APP LOGO]</div>
-          <div>Fantasy Basketball</div>
-        </div>
-        <div className="header-right">
-          <div>My Profile ▼</div>
-          <button className="logout-button">Logout</button>
-        </div>
-      </div>
+      <Header />
 
       <h2 className="dashboard-title">PLAYER DASHBOARD</h2>
 
@@ -71,6 +65,7 @@ function PlayerDashboard() {
           <li>Recent Activity: “Signed Player D, Dropped Player G.”</li>
         </ul>
       </div>
+    </div>
     </div>
   );
 }
