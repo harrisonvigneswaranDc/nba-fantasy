@@ -5,8 +5,10 @@ import Header from "./Header";
 function PlayerDashboardRoster() {
   const [roster, setRoster] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
+  // Function to fetch roster data from backend
+  const fetchRoster = () => {
     fetch("http://localhost:3001/roster", { credentials: "include" })
       .then((response) => {
         if (!response.ok) {
@@ -17,12 +19,72 @@ function PlayerDashboardRoster() {
       .then((data) => setRoster(data))
       .catch((error) => console.error("Error fetching roster:", error))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRoster();
   }, []);
 
   // Filter the roster by category
   const starters = roster.filter((player) => player.category === "starter");
   const bench = roster.filter((player) => player.category === "bench");
-  const dnp = roster.filter((player) => player.category === "reserve");
+  const reserve = roster.filter((player) => player.category === "reserve");
+
+  // Handler to update the player's category (local update)
+  const handleChangeCategory = (playerId, newCategory) => {
+    setRoster((prevRoster) =>
+      prevRoster.map((player) =>
+        player.player_id === playerId ? { ...player, category: newCategory } : player
+      )
+    );
+  };
+
+  // Handler to remove a player (local update)
+  const handleRemovePlayer = (playerId) => {
+    setRoster((prevRoster) =>
+      prevRoster.filter((player) => player.player_id !== playerId)
+    );
+  };
+
+  // Handler for Save Lineup with validation rules
+  const handleSaveLineup = () => {
+    setErrorMsg(""); // Clear any previous error message
+
+    // Validation rules (adjust thresholds as needed)
+    if (starters.length !== 5) {
+      setErrorMsg("You must have exactly 5 starters.");
+      return;
+    }
+    if (bench.length !== 4) {
+      setErrorMsg("You must have exactly 4 bench players.");
+      return;
+    }
+    if (reserve.length !== 6) {
+      setErrorMsg("You must have exactly 6 reserve players.");
+      return;
+    }
+
+    // If validation passes, send a request to save the lineup.
+    fetch("http://localhost:3001/roster/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ roster }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to save lineup");
+        return res.json();
+      })
+      .then(() => {
+        alert("Lineup saved successfully!");
+        // Optionally refresh the roster from backend
+        fetchRoster();
+      })
+      .catch((error) => {
+        console.error("Error saving lineup:", error);
+        setErrorMsg("Error saving lineup. Please try again.");
+      });
+  };
 
   if (loading) return <div>Loading roster...</div>;
 
@@ -33,7 +95,6 @@ function PlayerDashboardRoster() {
       <div className="content-row">
         {/* Left Column: Salary Cap Info + Roster */}
         <div className="left-column">
-          {/* Salary Cap Info */}
           <div className="salary-cap-card card">
             <p>
               <strong>Salary Cap:</strong>
@@ -46,6 +107,9 @@ function PlayerDashboardRoster() {
             </ul>
           </div>
 
+          {/* Display error message if any */}
+          {errorMsg && <div className="error-message">{errorMsg}</div>}
+
           {/* Starters Section */}
           <div className="roster-section card">
             <h3>Starters (Max 5)</h3>
@@ -57,9 +121,24 @@ function PlayerDashboardRoster() {
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
                     <div className="player-buttons">
-                      <button className="remove-player-btn">REMOVE</button>
-                      <button className="bench-btn">BENCH</button>
-                      <button className="dnp-btn">DNP</button>
+                      <button
+                        className="remove-player-btn"
+                        onClick={() => handleRemovePlayer(player.player_id)}
+                      >
+                        REMOVE
+                      </button>
+                      <button
+                        className="bench-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "bench")}
+                      >
+                        BENCH
+                      </button>
+                      <button
+                        className="dnp-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                      >
+                        DNP
+                      </button>
                     </div>
                   </li>
                 ))
@@ -80,9 +159,24 @@ function PlayerDashboardRoster() {
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
                     <div className="player-buttons">
-                      <button className="remove-player-btn">REMOVE</button>
-                      <button className="start-btn">START</button>
-                      <button className="dnp-btn">DNP</button>
+                      <button
+                        className="remove-player-btn"
+                        onClick={() => handleRemovePlayer(player.player_id)}
+                      >
+                        REMOVE
+                      </button>
+                      <button
+                        className="start-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "starter")}
+                      >
+                        START
+                      </button>
+                      <button
+                        className="dnp-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                      >
+                        DNP
+                      </button>
                     </div>
                   </li>
                 ))
@@ -96,16 +190,31 @@ function PlayerDashboardRoster() {
           <div className="roster-section card">
             <h3>DNP / Reserve (Max 6)</h3>
             <ul>
-              {dnp.length > 0 ? (
-                dnp.map((player) => (
+              {reserve.length > 0 ? (
+                reserve.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
                     <div className="player-buttons">
-                      <button className="remove-player-btn">REMOVE</button>
-                      <button className="bench-btn">BENCH</button>
-                      <button className="start-btn">START</button>
+                      <button
+                        className="remove-player-btn"
+                        onClick={() => handleRemovePlayer(player.player_id)}
+                      >
+                        REMOVE
+                      </button>
+                      <button
+                        className="bench-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "bench")}
+                      >
+                        BENCH
+                      </button>
+                      <button
+                        className="start-btn"
+                        onClick={() => handleChangeCategory(player.player_id, "starter")}
+                      >
+                        START
+                      </button>
                     </div>
                   </li>
                 ))
@@ -136,10 +245,11 @@ function PlayerDashboardRoster() {
         </div>
       </div>
 
-      {/* Footer Buttons: Save or Cancel */}
+      {/* Footer Button: Save Lineup */}
       <div className="lineup-buttons">
-        <button className="save-btn">Save Lineup</button>
-        <button className="cancel-btn">Cancel</button>
+        <button className="save-btn" onClick={handleSaveLineup}>
+          Save Lineup
+        </button>
       </div>
     </div>
   );

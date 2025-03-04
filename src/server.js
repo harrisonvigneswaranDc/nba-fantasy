@@ -179,6 +179,95 @@ app.get("/roster", async (req, res) => {
 });
 
 
+// POST /roster/category
+app.post("/roster/category", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+  try {
+    const { playerId, newCategory } = req.body;
+    const userId = req.user.user_id;
+    // Get team ID for the user
+    const teamResult = await pool.query("SELECT team_id FROM teams WHERE user_id = $1", [userId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    const teamId = teamResult.rows[0].team_id;
+    await pool.query(
+      "UPDATE rosters SET category = $1 WHERE team_id = $2 AND player_id = $3",
+      [newCategory, teamId, playerId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating player category:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+app.delete("/roster", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+  try {
+    const { playerId } = req.body;
+    const userId = req.user.user_id;
+    const teamResult = await pool.query("SELECT team_id FROM teams WHERE user_id = $1", [userId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    const teamId = teamResult.rows[0].team_id;
+    await pool.query("DELETE FROM rosters WHERE team_id = $1 AND player_id = $2", [teamId, playerId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error removing player:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+app.post("/roster/save", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+  try {
+    const { roster } = req.body;
+    if (!Array.isArray(roster)) {
+      return res.status(400).json({ error: "Invalid roster data." });
+    }
+    const userId = req.user.user_id;
+    // Get the team ID for the logged in user
+    const teamResult = await pool.query("SELECT team_id FROM teams WHERE user_id = $1", [userId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    const teamId = teamResult.rows[0].team_id;
+    
+    // Begin transaction
+    await pool.query("BEGIN");
+    
+    // For each player in the submitted roster, update their category in the rosters table.
+    // We assume each player object contains a `player_id` and a `category` field.
+    for (const player of roster) {
+      await pool.query(
+        "UPDATE rosters SET category = $1 WHERE team_id = $2 AND player_id = $3",
+        [player.category, teamId, player.player_id]
+      );
+    }
+    
+    // Commit the transaction
+    await pool.query("COMMIT");
+    
+    res.json({ success: true, message: "Lineup saved." });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("Error saving lineup:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 
 
 
