@@ -46,10 +46,8 @@ function HomePage() {
           </div>
         </section>
 
-        {/* Example link to Player Dashboard (for dev testing) */}
-        <div className="dev-link">
-          <p>Dev Testing: <Link to="/player-dashboard">Go to Player Dashboard</Link></p>
-        </div>
+        
+        
       </div>
 
       {/* Footer Area */}

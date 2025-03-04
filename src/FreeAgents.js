@@ -100,17 +100,6 @@ function FreeAgents() {
     <div className="free-agents-page">
       <Header />
 
-      {/* Header / Top Bar */}
-      <header className="top-bar">
-        <div className="top-bar-left">
-          <h2>FREE AGENTS</h2>
-        </div>
-        <div className="top-bar-right">
-          <span>[User Profile Icon]</span>
-          <button className="logout-btn">Logout</button>
-        </div>
-      </header>
-
       {/* Search / Filters Row */}
       <div className="filters-row">
         <input

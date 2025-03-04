@@ -1,13 +1,32 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./PlayerDashboardRoster.css";
 import Header from "./Header";
 
-
 function PlayerDashboardRoster() {
+  const [roster, setRoster] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("http://localhost:3001/roster", { credentials: "include" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return response.json();
+      })
+      .then((data) => setRoster(data))
+      .catch((error) => console.error("Error fetching roster:", error))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Filter the roster by category
+  const starters = roster.filter((player) => player.category === "starter");
+  const bench = roster.filter((player) => player.category === "bench");
+  const dnp = roster.filter((player) => player.category === "reserve");
+
+  if (loading) return <div>Loading roster...</div>;
+
   return (
-    <div>
-      
-    
     <div className="roster-page">
       <Header />
 
@@ -16,10 +35,9 @@ function PlayerDashboardRoster() {
         <div className="left-column">
           {/* Salary Cap Info */}
           <div className="salary-cap-card card">
-            <p><strong>Salary Cap:</strong> 
-              <span className="progress-bar">
-                ($152M used / $165M)
-              </span>
+            <p>
+              <strong>Salary Cap:</strong>
+              <span className="progress-bar">($152M used / $165M)</span>
             </p>
             <ul>
               <li>- You are currently $13M below the Hard Cap</li>
@@ -32,11 +50,22 @@ function PlayerDashboardRoster() {
           <div className="roster-section card">
             <h3>Starters (Max 5)</h3>
             <ul>
-              <li>PG: Stephen Curry ($10M) [Bench?]</li>
-              <li>SG: Klay Thompson ($5M) [Bench?]</li>
-              <li>SF: LeBron James ($15M) [Bench?]</li>
-              <li>PF: Anthony Davis ($12M) [Bench?]</li>
-              <li>C: Nikola Jokic ($18M) [Bench?]</li>
+              {starters.length > 0 ? (
+                starters.map((player) => (
+                  <li key={player.player_id} className="player-item">
+                    <div className="player-info">
+                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                    </div>
+                    <div className="player-buttons">
+                      <button className="remove-player-btn">REMOVE</button>
+                      <button className="bench-btn">BENCH</button>
+                      <button className="dnp-btn">DNP</button>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li>No starters assigned</li>
+              )}
             </ul>
           </div>
 
@@ -44,23 +73,45 @@ function PlayerDashboardRoster() {
           <div className="roster-section card">
             <h3>Bench (Max 4)</h3>
             <ul>
-              <li>1. Chris Paul ($8M) [Start?]</li>
-              <li>2. Andrew Wiggins ($8M) [Start?]</li>
-              <li>3. Draymond Green ($7M) [Start?]</li>
-              <li>4. Kelly Oubre Jr. ($6M) [Start?]</li>
+              {bench.length > 0 ? (
+                bench.map((player) => (
+                  <li key={player.player_id} className="player-item">
+                    <div className="player-info">
+                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                    </div>
+                    <div className="player-buttons">
+                      <button className="remove-player-btn">REMOVE</button>
+                      <button className="start-btn">START</button>
+                      <button className="dnp-btn">DNP</button>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li>No bench players assigned</li>
+              )}
             </ul>
           </div>
 
-          {/* DNP Section */}
+          {/* DNP / Reserve Section */}
           <div className="roster-section card">
-            <h3>DNP (Max 6)</h3>
+            <h3>DNP / Reserve (Max 6)</h3>
             <ul>
-              <li>1. Vacant Roster Spot ... [Bench?]</li>
-              <li>2. Vacant Roster Spot ... [Bench?]</li>
-              <li>3. Vacant Roster Spot ... [Bench?]</li>
-              <li>4. Vacant Roster Spot ... [Bench?]</li>
-              <li>5. Vacant Roster Spot ... [Bench?]</li>
-              <li>6. Vacant Roster Spot ... [Bench?]</li>
+              {dnp.length > 0 ? (
+                dnp.map((player) => (
+                  <li key={player.player_id} className="player-item">
+                    <div className="player-info">
+                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                    </div>
+                    <div className="player-buttons">
+                      <button className="remove-player-btn">REMOVE</button>
+                      <button className="bench-btn">BENCH</button>
+                      <button className="start-btn">START</button>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li>No reserve players assigned</li>
+              )}
             </ul>
           </div>
         </div>
@@ -90,7 +141,6 @@ function PlayerDashboardRoster() {
         <button className="save-btn">Save Lineup</button>
         <button className="cancel-btn">Cancel</button>
       </div>
-    </div>
     </div>
   );
 }

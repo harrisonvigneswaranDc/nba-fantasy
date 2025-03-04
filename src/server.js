@@ -69,14 +69,14 @@ passport.use(
 
 // Serialize the user to store user ID in the session
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  done(null, user.user_id);
 });
 
 // Deserialize the user to get the user from the session
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const result = await pool.query("SELECT * FROM users WHERE id = $1;", [id]);
+    const result = await pool.query("SELECT * FROM users WHERE user_id = $1;", [id]);
     if (result.rows.length === 0) {
       return done(null, false);
     }
@@ -136,6 +136,51 @@ app.get("/freeagents", async (req, res) => {
         console.error(err.message);
     }
 });
+
+
+app.get("/roster", async (req, res) => {
+  // Check if user is authenticated
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+  
+  try {
+    // Get the user ID from the logged in user (assuming it's stored as req.user.user_id)
+    const userId = req.user.user_id;
+    
+    // Query the teams table to find the team associated with this user.
+    // If a user can have only one team per league, you might also want to filter by league_id.
+    const teamResult = await pool.query(
+      "SELECT team_id FROM teams WHERE user_id = $1",
+      [userId]
+    );
+    
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    
+    // Use the team_id from the result
+    const teamId = teamResult.rows[0].team_id;
+    
+    // Now, query the rosters table with this team_id
+    const rosterResult = await pool.query(
+      `SELECT rosters.*, players.* 
+       FROM rosters 
+       JOIN players ON rosters.player_id = players.player_id 
+       WHERE rosters.team_id = $1`,
+      [teamId]
+    );
+    
+    res.json(rosterResult.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
