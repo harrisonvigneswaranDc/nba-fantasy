@@ -269,6 +269,75 @@ app.post("/roster/save", async (req, res) => {
 
 
 
+app.get("/games-played", async (req, res) => {
+  const matchupId = req.query.matchup_id;
+  const gamePlayedId = req.query.gamePlayedId;
+
+  if (!matchupId || !gamePlayedId) {
+    return res.status(400).json({ error: "Missing matchup_id or gamePlayedId parameter" });
+  }
+
+  try {
+    // Fetch detailed matchup information including team names, scores, etc.
+    const matchupQuery = `
+      SELECT 
+        m.matchup_id,
+        m.team_a_id AS "teamA_id",
+        m.team_b_id AS "teamB_id",
+        ta.team_name AS "teamA_name",
+        tb.team_name AS "teamB_name"
+      FROM matchups m
+      JOIN teams ta ON m.team_a_id = ta.team_id
+      JOIN teams tb ON m.team_b_id = tb.team_id
+      WHERE m.matchup_id = $1;
+    `;
+    const matchupResult = await pool.query(matchupQuery, [matchupId]);
+    if (matchupResult.rows.length === 0) {
+      return res.status(404).json({ error: "Matchup not found" });
+    }
+    const matchup = matchupResult.rows[0];
+
+    // Fetch player stats for both teams
+    const statsQuery = `
+      SELECT 
+        r.team_id,
+        r.category,
+        p.player AS "player_name",
+        p.pos,
+        pgp.pts,
+        pgp.reb,
+        pgp.ast,
+        pgp.stl,
+        pgp.blk
+      FROM rosters r
+      JOIN player_games_played pgp ON r.player_id = pgp.player_id
+      JOIN players p ON r.player_id = p.player_id
+      WHERE r.team_id IN ($1, $2)
+        AND pgp.game_played_id = $3
+      ORDER BY r.team_id, p.player ASC;
+    `;
+    const statsResult = await pool.query(statsQuery, [matchup.teamA_id, matchup.teamB_id, gamePlayedId]);
+
+    // Separate stats into teamA and teamB
+    const teamAStats = statsResult.rows.filter(row => row.team_id === matchup.teamA_id);
+    const teamBStats = statsResult.rows.filter(row => row.team_id === matchup.teamB_id);
+
+    res.json({
+      matchup,
+      stats: {
+        teamA: teamAStats,
+        teamB: teamBStats
+      }
+    });
+
+  } catch (err) {
+    console.error("Error querying games played:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
 
 const PORT = process.env.PORT || 3001;

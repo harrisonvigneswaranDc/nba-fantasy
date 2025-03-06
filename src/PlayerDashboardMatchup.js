@@ -1,38 +1,158 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./PlayerDashboardMatchup.css";
 import Header from "./Header";
 
 function PlayerDashboardMatchup() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchUrl = `http://localhost:3001/games-played?matchup_id=1&gamePlayedId=1`;
+    fetch(fetchUrl, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return res.json();
+      })
+      .then((jsonData) => {
+        setData(jsonData);
+      })
+      .catch((err) => {
+        console.error("Error fetching matchup data:", err);
+        setError("Error fetching matchup data");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div>Loading matchup data...</div>;
+  if (error) return <div>{error}</div>;
+  if (!data) return <div>No matchup data available.</div>;
+
+  // Destructure matchup and stats from fetched data
+  const { matchup, stats } = data;
+
+  // Split players into groups for each team.
+  // For display purposes, we'll treat 'reserve' as DNP.
+  const teamAStarters = stats.teamA.filter(
+    (player) => player.category === "starter"
+  );
+  const teamABench = stats.teamA.filter(
+    (player) => player.category === "bench"
+  );
+  const teamADNP = stats.teamA.filter(
+    (player) => player.category === "reserve"
+  );
+
+  const teamBStarters = stats.teamB.filter(
+    (player) => player.category === "starter"
+  );
+  const teamBBench = stats.teamB.filter(
+    (player) => player.category === "bench"
+  );
+  const teamBDNP = stats.teamB.filter(
+    (player) => player.category === "reserve"
+  );
+
+  
+  // It renders a section header and then rows side-by-side for both teams.
+  function renderCategoryRows(categoryLabel, teamAPlayers, teamBPlayers) {
+    const maxLength = Math.max(teamAPlayers.length, teamBPlayers.length);
+    const rows = [];
+
+    // Section header row (e.g., "STARTERS", "BENCH", or "DNP")
+    rows.push(
+      <tr className="section-label" key={`${categoryLabel}-header`}>
+        <td colSpan="12">{categoryLabel.toUpperCase()}</td>
+        <td className="middle-col"></td>
+        <td colSpan="12">{categoryLabel.toUpperCase()}</td>
+      </tr>
+    );
+
+    for (let i = 0; i < maxLength; i++) {
+      const playerA = teamAPlayers[i];
+      const playerB = teamBPlayers[i];
+
+      rows.push(
+        <tr key={`${categoryLabel}-row-${i}`}>
+          {/* Team A data */}
+          {playerA ? (
+            <>
+              <td>{playerA.pos}</td>
+              <td>{playerA.player_name}</td>
+              <td>{playerA.opp_time || "-"}</td>
+              <td>{playerA.injury || "-"}</td>
+              <td>{playerA.curr_pts || "-"}</td>
+              <td>{playerA.tot_fan_pts || "-"}</td>
+              <td>{playerA.pts}</td>
+              <td>{playerA.reb}</td>
+              <td>{playerA.ast}</td>
+              <td>{playerA.stl}</td>
+              <td>{playerA.blk}</td>
+              <td>{playerA.tov || "-"}</td>
+            </>
+          ) : (
+            <td colSpan="12"></td>
+          )}
+          {/* Divider */}
+          <td className="middle-col">|</td>
+          {/* Team B data */}
+          {playerB ? (
+            <>
+              <td>{playerB.pos}</td>
+              <td>{playerB.player_name}</td>
+              <td>{playerB.opp_time || "-"}</td>
+              <td>{playerB.injury || "-"}</td>
+              <td>{playerB.curr_pts || "-"}</td>
+              <td>{playerB.tot_fan_pts || "-"}</td>
+              <td>{playerB.pts}</td>
+              <td>{playerB.reb}</td>
+              <td>{playerB.ast}</td>
+              <td>{playerB.stl}</td>
+              <td>{playerB.blk}</td>
+              <td>{playerB.tov || "-"}</td>
+            </>
+          ) : (
+            <td colSpan="12"></td>
+          )}
+        </tr>
+      );
+    }
+
+    return rows;
+  }
+
   return (
-    <div>
-      
-
-
     <div className="matchup-page">
       <Header />
 
       {/* Team Header Section */}
       <div className="team-header-section">
         <div className="team-header-left">
-          <div className="team-name">Battery Brains (Score: 545.70)</div>
+          <div className="team-name">
+            {matchup.teamA_name} (Score: {/* include score if available */})
+          </div>
           <div className="manager-record">
-            Manager: Harrison (Since '21), Record: 3-8-0 (12th)
+            {/* Manager and record details for team A */}
           </div>
         </div>
-        <div className="vs-score">894.60 vs 894.60</div>
+        <div className="vs-score">VS</div>
         <div className="team-header-right">
-          <div className="team-name">Raptors Revenge</div>
+          <div className="team-name">
+            {matchup.teamB_name} (Score: {/* include score if available */})
+          </div>
           <div className="manager-record">
-            Manager: Gurman (Since '21), Record: 10-1-0 (1st)
+            {/* Manager and record details for team B */}
           </div>
         </div>
       </div>
 
       {/* Date Navigation (Optional) */}
       <div className="date-nav">
-        <button>&lt;- Tue, Jan 21</button>
-        <span>Wed, Jan 22</span>
-        <button>Thu, Jan 23 -&gt;</button>
+        <button>&lt;- Prev Day</button>
+        <span>Current Date</span>
+        <button>Next Day -&gt;</button>
       </div>
 
       {/* Main Matchup Table */}
@@ -40,7 +160,7 @@ function PlayerDashboardMatchup() {
         <table className="matchup-table">
           <thead>
             <tr>
-              {/* LEFT TEAM (12 columns) */}
+              {/* LEFT TEAM (columns) */}
               <th>Pos</th>
               <th>Player</th>
               <th>Opp-Time</th>
@@ -53,11 +173,9 @@ function PlayerDashboardMatchup() {
               <th>ST</th>
               <th>BLK</th>
               <th>TO</th>
-
-              {/* Middle Column (1 col) */}
+              {/* Middle Divider */}
               <th className="middle-col">|</th>
-
-              {/* RIGHT TEAM (12 columns) */}
+              {/* RIGHT TEAM (columns) */}
               <th>Pos</th>
               <th>Player</th>
               <th>Opp-Time</th>
@@ -72,160 +190,16 @@ function PlayerDashboardMatchup() {
               <th>TO</th>
             </tr>
           </thead>
-
           <tbody>
-            {/* STARTERS Label Row */}
-            <tr className="section-label">
-              <td colSpan="12">STARTERS</td>
-              <td className="middle-col"></td>
-              <td colSpan="12">STARTERS</td>
-            </tr>
-
-            {/* Example Starter Row */}
-            <tr>
-              {/* Left (12) */}
-              <td>PG</td>
-              <td>Donovan Mitchell</td>
-              <td>@HOU, 8pm</td>
-              <td>-</td> {/* Injury status if any */}
-              <td>29.10</td>
-              <td>55.20</td>
-              <td>19</td>
-              <td>3</td>
-              <td>3</td>
-              <td>0</td>
-              <td>1</td>
-              <td>1</td>
-
-              {/* Middle */}
-              <td className="middle-col">|</td>
-
-              {/* Right (12) */}
-              <td>PG</td>
-              <td>Fred VanVleet</td>
-              <td>@CHI,9pm</td>
-              <td>-</td>
-              <td>38.70</td>
-              <td>85.90</td>
-              <td>22</td>
-              <td>4</td>
-              <td>7</td>
-              <td>2</td>
-              <td>0</td>
-              <td>3</td>
-            </tr>
-
-            {/* Another example row */}
-            <tr>
-              <td>SG</td>
-              <td>Bradley Beal (GTD)</td>
-              <td>@BKN,6pm</td>
-              <td>GTD</td>
-              <td>0.00</td>
-              <td>15.40</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-
-              <td className="middle-col">|</td>
-
-              <td>SG</td>
-              <td>Gary Trent Jr.</td>
-              <td>vs PHI,8pm</td>
-              <td>-</td>
-              <td>10.50</td>
-              <td>32.10</td>
-              <td>8</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
-
-            {/* BENCH Label Row */}
-            <tr className="section-label">
-              <td colSpan="12">BENCH</td>
-              <td className="middle-col"></td>
-              <td colSpan="12">BENCH</td>
-            </tr>
-
-            <tr>
-              <td>1.</td>
-              <td>Chris Paul</td>
-              <td>vs MIA,7pm</td>
-              <td>-</td>
-              <td>12.50</td>
-              <td>30.0</td>
-              <td>14</td>
-              <td>4</td>
-              <td>8</td>
-              <td>2</td>
-              <td>0</td>
-              <td>3</td>
-
-              <td className="middle-col">|</td>
-
-              <td>1.</td>
-              <td>Precious Achiuwa</td>
-              <td>@NYK,7:30</td>
-              <td>-</td>
-              <td>4.50</td>
-              <td>16.2</td>
-              <td>6</td>
-              <td>5</td>
-              <td>1</td>
-              <td>1</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
-
-            {/* DNP Label Row */}
-            <tr className="section-label">
-              <td colSpan="12">DNP</td>
-              <td className="middle-col"></td>
-              <td colSpan="12">DNP</td>
-            </tr>
-
-            <tr>
-              <td>PF</td>
-              <td>Jarred Vanderbilt</td>
-              <td>vs DAL,7:30</td>
-              <td>Out-Injury</td>
-              <td>0.00</td>
-              <td>0.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-
-              <td className="middle-col">|</td>
-
-              <td>PG</td>
-              <td>Malik Beasley</td>
-              <td>vs MIN,7pm</td>
-              <td>Out-Injury</td>
-              <td>0.00</td>
-              <td>0.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-            </tr>
-            {/* more rows if needed ... */}
+            {renderCategoryRows("Starters", teamAStarters, teamBStarters)}
+            {renderCategoryRows("Bench", teamABench, teamBBench)}
+            {renderCategoryRows("DNP", teamADNP, teamBDNP)}
           </tbody>
         </table>
       </div>
-    </div>
     </div>
   );
 }
 
 export default PlayerDashboardMatchup;
+
