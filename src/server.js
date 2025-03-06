@@ -299,23 +299,24 @@ app.get("/games-played", async (req, res) => {
 
     // Fetch player stats for both teams
     const statsQuery = `
-      SELECT 
-        r.team_id,
-        r.category,
-        p.player AS "player_name",
-        p.pos,
-        pgp.pts,
-        pgp.reb,
-        pgp.ast,
-        pgp.stl,
-        pgp.blk
-      FROM rosters r
-      JOIN player_games_played pgp ON r.player_id = pgp.player_id
-      JOIN players p ON r.player_id = p.player_id
-      WHERE r.team_id IN ($1, $2)
-        AND pgp.game_played_id = $3
-      ORDER BY r.team_id, p.player ASC;
-    `;
+  SELECT 
+    r.team_id,
+    r.category,
+    p.player AS "player_name",
+    p.pos,
+    pgp.pts,
+    pgp.reb,
+    pgp.ast,
+    pgp.stl,
+    pgp.blk
+  FROM rosters r
+  JOIN players p ON r.player_id = p.player_id
+  LEFT JOIN player_games_played pgp 
+    ON r.player_id = pgp.player_id 
+    AND pgp.game_played_id = $3
+  WHERE r.team_id IN ($1, $2)
+  ORDER BY r.team_id, p.player ASC;
+`;
     const statsResult = await pool.query(statsQuery, [matchup.teamA_id, matchup.teamB_id, gamePlayedId]);
 
     // Separate stats into teamA and teamB
@@ -335,7 +336,6 @@ app.get("/games-played", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 
 
