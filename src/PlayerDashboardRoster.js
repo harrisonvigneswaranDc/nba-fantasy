@@ -7,26 +7,32 @@ function PlayerDashboardRoster() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-  const [seasonRange, setSeasonRange] = useState({ season_start: "", season_end: "", league_name: "" });
+  const [seasonRange, setSeasonRange] = useState({
+    season_start: "",
+    season_end: "",
+    league_name: ""
+  });
 
-  // Fetch league info to get season start/end and league name.
+  // Fetch league info (season dates and league name)
   useEffect(() => {
     fetch("http://localhost:3001/league-info", { credentials: "include" })
       .then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to fetch league info");
-        }
+        if (!res.ok) throw new Error("Failed to fetch league info");
         return res.json();
       })
       .then((leagueInfo) => {
-        const seasonStart = new Date(leagueInfo.season_start).toISOString().slice(0, 10);
-        const seasonEnd = new Date(leagueInfo.season_end).toISOString().slice(0, 10);
+        const seasonStart = new Date(leagueInfo.season_start)
+          .toISOString()
+          .slice(0, 10);
+        const seasonEnd = new Date(leagueInfo.season_end)
+          .toISOString()
+          .slice(0, 10);
         setSeasonRange({
           season_start: seasonStart,
           season_end: seasonEnd,
           league_name: leagueInfo.league_name,
         });
-        // Default selected date to the season start (or adjust logic if needed)
+        // Default to season start or adjust as needed
         setSelectedDate(seasonStart);
       })
       .catch((err) => {
@@ -35,7 +41,7 @@ function PlayerDashboardRoster() {
       });
   }, []);
 
-  // Fetch roster data for a given game date.
+  // Fetch roster for a given date
   const fetchRoster = (date) => {
     setLoading(true);
     const url = `http://localhost:3001/roster?gameDate=${date}`;
@@ -54,27 +60,25 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
-  // Re-fetch roster whenever selectedDate changes.
+  // When selectedDate changes, re-fetch the roster
   useEffect(() => {
     if (selectedDate) {
       fetchRoster(selectedDate);
     }
   }, [selectedDate]);
 
-  // Determine if the roster is locked.
-  // For example, if the selected date is in the past relative to today, we lock the roster.
-  // (Adjust the logic as needed—for instance, you may compare with CURRENT_DATE.)
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const rosterLocked = selectedDate < todayStr; // Lock if selected date is in the past
+  // Lock editing if any player record for the selected date has roster_picked true.
+  const rosterLocked = roster.some(player => player.roster_picked === true);
 
-  // Filter the roster by category.
+  // Filter roster by category
   const starters = roster.filter((player) => player.category === "starter");
   const bench = roster.filter((player) => player.category === "bench");
   const reserve = roster.filter((player) => player.category === "reserve");
 
-  // Handler to update the player's category (only if editing is allowed).
+  // Handler to update category (only allowed if not locked)
   const handleChangeCategory = (playerId, newCategory) => {
     if (rosterLocked) return;
+
     fetch("http://localhost:3001/roster/category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,7 +95,7 @@ function PlayerDashboardRoster() {
       .catch((error) => console.error("Error updating category:", error));
   };
 
-  // Handler to remove a player locally (if editing is allowed).
+  // Handler to remove player (only if not locked)
   const handleRemovePlayer = (playerId) => {
     if (rosterLocked) return;
     setRoster((prevRoster) =>
@@ -99,9 +103,10 @@ function PlayerDashboardRoster() {
     );
   };
 
-  // Handler for saving the lineup.
+  // Save lineup handler
   const handleSaveLineup = () => {
     setErrorMsg("");
+
     if (starters.length !== 5) {
       setErrorMsg("You must have exactly 5 starters.");
       return;
@@ -135,7 +140,7 @@ function PlayerDashboardRoster() {
       });
   };
 
-  // Date navigation handlers. Also, restrict the date selection within the season.
+  // Date navigation handlers (restricting to season range)
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() - 1);
@@ -179,7 +184,7 @@ function PlayerDashboardRoster() {
         />
         {rosterLocked && (
           <span className="locked-message">
-            Roster is locked for this game (already played).
+            Roster is locked for this game (finalized).
           </span>
         )}
       </div>
@@ -209,7 +214,8 @@ function PlayerDashboardRoster() {
                 starters.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                      <strong>{player.player_name}</strong> ({player.pos}) - $
+                      {player.salary}
                     </div>
                     {!rosterLocked && (
                       <div className="player-buttons">
@@ -249,7 +255,8 @@ function PlayerDashboardRoster() {
                 bench.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                      <strong>{player.player_name}</strong> ({player.pos}) - $
+                      {player.salary}
                     </div>
                     {!rosterLocked && (
                       <div className="player-buttons">
@@ -289,7 +296,8 @@ function PlayerDashboardRoster() {
                 reserve.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
+                      <strong>{player.player_name}</strong> ({player.pos}) - $
+                      {player.salary}
                     </div>
                     {!rosterLocked && (
                       <div className="player-buttons">
@@ -342,7 +350,7 @@ function PlayerDashboardRoster() {
         </div>
       </div>
 
-      {/* Footer Button: Save Lineup (only if roster is not locked) */}
+      {/* Footer Button: Save Lineup (only if not locked) */}
       {!rosterLocked && (
         <div className="lineup-buttons">
           <button className="save-btn" onClick={handleSaveLineup}>

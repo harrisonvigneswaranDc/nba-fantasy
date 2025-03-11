@@ -143,15 +143,27 @@ app.get("/roster", async (req, res) => {
 
     // Join the rosters table with roster_schedule for the given date.
     const rosterResult = await pool.query(
-      `SELECT r.team_id, r.player_id, p.player, p.pos, p.salary, rs.category
-       FROM rosters r
-       JOIN players p ON r.player_id = p.player_id
-       LEFT JOIN roster_schedule rs 
-         ON r.team_id = rs.team_id 
-         AND r.player_id = rs.player_id 
-         AND rs.schedule_date = $1
-       WHERE r.team_id = $2
-       ORDER BY p.player ASC;`,
+      `-- Example query in your GET /roster endpoint:
+SELECT 
+  r.team_id, 
+  r.player_id, 
+  p.player AS player_name,
+  p.pos,
+  p.salary,
+  COALESCE(rs.category, r.category) AS category,
+  pgp.roster_picked
+FROM rosters r
+JOIN players p ON r.player_id = p.player_id
+LEFT JOIN roster_schedule rs 
+  ON r.team_id = rs.team_id 
+  AND r.player_id = rs.player_id 
+  AND rs.schedule_date = $1
+LEFT JOIN player_games_played pgp 
+  ON r.player_id = pgp.player_id 
+  AND pgp.game_date_played = $1
+WHERE r.team_id = $2
+ORDER BY p.player ASC;
+`,
       [gameDate, teamId]
     );
     
@@ -400,7 +412,6 @@ app.get("/matchup-season", async (req, res) => {
   }
 
   try {
-    // Retrieve the logged-in user's team (and league)
     const userId = req.user.user_id;
     const teamResult = await pool.query(
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
@@ -411,7 +422,6 @@ app.get("/matchup-season", async (req, res) => {
     }
     const { team_id, league_id } = teamResult.rows[0];
 
-    // Find an active matchup for the user's league that includes their team.
     const matchupQuery = `
       SELECT 
         m.matchup_id,
@@ -437,75 +447,52 @@ app.get("/matchup-season", async (req, res) => {
     }
     const matchup = matchupResult.rows[0];
 
-    // Create a date series from the matchup start to end dates
-    // And combine the game stats from played and future games.
+    // Build the stats query (using only player_games_played)
     const statsQuery = `
       WITH date_series AS (
-  SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
-),
-game_stats AS (
-  -- Past (played) games
-  SELECT 
-    player_id,
-    game_date_played AS game_date,
-    pts,
-    reb,
-    ast,
-    stl,
-    blk,
-    NULL AS opp_time,
-    'played' AS source
-  FROM player_games_played
-  
-  UNION ALL
-  
-  -- Future (unplayed) games
-  SELECT 
-    player_id,
-    future_game_date AS game_date,
-    NULL AS pts,
-    NULL AS reb,
-    NULL AS ast,
-    NULL AS stl,
-    NULL AS blk,
-    player_opp AS opp_time,
-    'future' AS source
-  FROM player_games_future
-)
-
-SELECT
-  ds.game_date,
-  r.team_id,
-  r.player_id,
-  p.player AS player_name,
-  p.pos,
-  gs.pts,
-  gs.reb,
-  gs.ast,
-  gs.stl,
-  gs.blk,
-  gs.opp_time,
-  COALESCE(rs.category, r.category) AS category,  
-  gs.source
-
-FROM date_series ds
-CROSS JOIN rosters r
-JOIN players p
-  ON r.player_id = p.player_id
-
--- LEFT JOIN the combined stats (played/future)
-LEFT JOIN game_stats gs
-  ON gs.player_id = r.player_id
-  AND gs.game_date = ds.game_date
-
--- LEFT JOIN your roster_schedule for the same date
-LEFT JOIN roster_schedule rs
-  ON r.team_id = rs.team_id
-  AND r.player_id = rs.player_id
-  AND rs.schedule_date = ds.game_date
-
-WHERE r.team_id IN ($3, $4)  
-ORDER BY r.team_id, ds.game_date, p.player;
+        SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
+      ),
+      game_stats AS (
+        SELECT 
+          player_id,
+          game_date_played AS game_date,
+          pts,
+          reb,
+          ast,
+          stl,
+          blk,
+          NULL AS opp_time,
+          'played' AS source,
+          roster_picked
+        FROM player_games_played
+      )
+      SELECT
+        ds.game_date,
+        r.team_id,
+        r.player_id,
+        p.player AS player_name,
+        p.pos,
+        gs.pts,
+        gs.reb,
+        gs.ast,
+        gs.stl,
+        gs.blk,
+        gs.opp_time,
+        COALESCE(rs.category, r.category) AS category,
+        gs.source,
+        gs.roster_picked
+      FROM date_series ds
+      CROSS JOIN rosters r
+      JOIN players p ON r.player_id = p.player_id
+      LEFT JOIN game_stats gs
+        ON gs.player_id = r.player_id
+        AND gs.game_date = ds.game_date
+      LEFT JOIN roster_schedule rs
+        ON r.team_id = rs.team_id
+        AND r.player_id = rs.player_id
+        AND rs.schedule_date = ds.game_date
+      WHERE r.team_id IN ($3, $4)
+      ORDER BY r.team_id, ds.game_date, p.player ASC;
     `;
     const statsResult = await pool.query(statsQuery, [
       matchup.start_date,
@@ -523,6 +510,7 @@ ORDER BY r.team_id, ds.game_date, p.player;
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 
 
