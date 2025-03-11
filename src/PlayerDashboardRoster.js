@@ -6,11 +6,40 @@ function PlayerDashboardRoster() {
   const [roster, setRoster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  
+  const [selectedDate, setSelectedDate] = useState("");
+  const [seasonRange, setSeasonRange] = useState({ season_start: "", season_end: "", league_name: "" });
 
-  // Function to fetch roster data from backend
-  const fetchRoster = () => {
-    fetch("http://localhost:3001/roster", { credentials: "include" })
+  // Fetch league info to get season start/end and league name.
+  useEffect(() => {
+    fetch("http://localhost:3001/league-info", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to fetch league info");
+        }
+        return res.json();
+      })
+      .then((leagueInfo) => {
+        const seasonStart = new Date(leagueInfo.season_start).toISOString().slice(0, 10);
+        const seasonEnd = new Date(leagueInfo.season_end).toISOString().slice(0, 10);
+        setSeasonRange({
+          season_start: seasonStart,
+          season_end: seasonEnd,
+          league_name: leagueInfo.league_name,
+        });
+        // Default selected date to the season start (or adjust logic if needed)
+        setSelectedDate(seasonStart);
+      })
+      .catch((err) => {
+        console.error(err);
+        setErrorMsg("Error fetching league info");
+      });
+  }, []);
+
+  // Fetch roster data for a given game date.
+  const fetchRoster = (date) => {
+    setLoading(true);
+    const url = `http://localhost:3001/roster?gameDate=${date}`;
+    fetch(url, { credentials: "include" })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Network response was not ok");
@@ -18,40 +47,61 @@ function PlayerDashboardRoster() {
         return response.json();
       })
       .then((data) => setRoster(data))
-      .catch((error) => console.error("Error fetching roster:", error))
+      .catch((error) => {
+        console.error("Error fetching roster:", error);
+        setErrorMsg("Error fetching roster");
+      })
       .finally(() => setLoading(false));
   };
 
+  // Re-fetch roster whenever selectedDate changes.
   useEffect(() => {
-    fetchRoster();
-  }, []);
+    if (selectedDate) {
+      fetchRoster(selectedDate);
+    }
+  }, [selectedDate]);
 
-  // Filter the roster by category
+  // Determine if the roster is locked.
+  // For example, if the selected date is in the past relative to today, we lock the roster.
+  // (Adjust the logic as needed—for instance, you may compare with CURRENT_DATE.)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const rosterLocked = selectedDate < todayStr; // Lock if selected date is in the past
+
+  // Filter the roster by category.
   const starters = roster.filter((player) => player.category === "starter");
   const bench = roster.filter((player) => player.category === "bench");
   const reserve = roster.filter((player) => player.category === "reserve");
 
-  // Handler to update the player's category (local update)
+  // Handler to update the player's category (only if editing is allowed).
   const handleChangeCategory = (playerId, newCategory) => {
-    setRoster((prevRoster) =>
-      prevRoster.map((player) =>
-        player.player_id === playerId ? { ...player, category: newCategory } : player
-      )
-    );
+    if (rosterLocked) return;
+    fetch("http://localhost:3001/roster/category", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ playerId, newCategory, gameDate: selectedDate }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to update player category.");
+        return res.json();
+      })
+      .then(() => {
+        fetchRoster(selectedDate);
+      })
+      .catch((error) => console.error("Error updating category:", error));
   };
 
-  // Handler to remove a player (local update)
+  // Handler to remove a player locally (if editing is allowed).
   const handleRemovePlayer = (playerId) => {
+    if (rosterLocked) return;
     setRoster((prevRoster) =>
       prevRoster.filter((player) => player.player_id !== playerId)
     );
   };
 
-  // Handler for Save Lineup with validation rules
+  // Handler for saving the lineup.
   const handleSaveLineup = () => {
-    setErrorMsg(""); // Clear any previous error message
-
-    // Validation rules (adjust thresholds as needed)
+    setErrorMsg("");
     if (starters.length !== 5) {
       setErrorMsg("You must have exactly 5 starters.");
       return;
@@ -65,21 +115,19 @@ function PlayerDashboardRoster() {
       return;
     }
 
-    // If validation passes, send a request to save the lineup.
     fetch("http://localhost:3001/roster/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ roster }),
+      body: JSON.stringify({ roster, gameDate: selectedDate }),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to save lineup");
         return res.json();
       })
       .then(() => {
-        alert("Lineup saved successfully!");
-        // Optionally refresh the roster from backend
-        fetchRoster();
+        alert(`Lineup saved successfully for ${selectedDate}!`);
+        fetchRoster(selectedDate);
       })
       .catch((error) => {
         console.error("Error saving lineup:", error);
@@ -87,11 +135,54 @@ function PlayerDashboardRoster() {
       });
   };
 
+  // Date navigation handlers. Also, restrict the date selection within the season.
+  const handlePrevDay = () => {
+    const current = new Date(selectedDate);
+    current.setDate(current.getDate() - 1);
+    const newDate = current.toISOString().slice(0, 10);
+    if (newDate >= seasonRange.season_start) {
+      setSelectedDate(newDate);
+    }
+  };
+
+  const handleNextDay = () => {
+    const current = new Date(selectedDate);
+    current.setDate(current.getDate() + 1);
+    const newDate = current.toISOString().slice(0, 10);
+    if (newDate <= seasonRange.season_end) {
+      setSelectedDate(newDate);
+    }
+  };
+
   if (loading) return <div>Loading roster...</div>;
 
   return (
     <div className="roster-page">
       <Header />
+
+      {/* League Info & Date Selection Section */}
+      <div className="date-section">
+        <div className="league-info">
+          <p>
+            Season: {seasonRange.season_start} to {seasonRange.season_end} <br />
+            League: {seasonRange.league_name}
+          </p>
+        </div>
+        <label htmlFor="game-date">Select Game Date: </label>
+        <input
+          type="date"
+          id="game-date"
+          value={selectedDate}
+          min={seasonRange.season_start}
+          max={seasonRange.season_end}
+          onChange={(e) => setSelectedDate(e.target.value)}
+        />
+        {rosterLocked && (
+          <span className="locked-message">
+            Roster is locked for this game (already played).
+          </span>
+        )}
+      </div>
 
       <div className="content-row">
         {/* Left Column: Salary Cap Info + Roster */}
@@ -108,7 +199,6 @@ function PlayerDashboardRoster() {
             </ul>
           </div>
 
-          {/* Display error message if any */}
           {errorMsg && <div className="error-message">{errorMsg}</div>}
 
           {/* Starters Section */}
@@ -121,26 +211,28 @@ function PlayerDashboardRoster() {
                     <div className="player-info">
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
-                    <div className="player-buttons">
-                      <button
-                        className="remove-player-btn"
-                        onClick={() => handleRemovePlayer(player.player_id)}
-                      >
-                        REMOVE
-                      </button>
-                      <button
-                        className="bench-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "bench")}
-                      >
-                        BENCH
-                      </button>
-                      <button
-                        className="dnp-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "reserve")}
-                      >
-                        DNP
-                      </button>
-                    </div>
+                    {!rosterLocked && (
+                      <div className="player-buttons">
+                        <button
+                          className="remove-player-btn"
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                        >
+                          REMOVE
+                        </button>
+                        <button
+                          className="bench-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "bench")}
+                        >
+                          BENCH
+                        </button>
+                        <button
+                          className="dnp-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                        >
+                          DNP
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))
               ) : (
@@ -159,26 +251,28 @@ function PlayerDashboardRoster() {
                     <div className="player-info">
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
-                    <div className="player-buttons">
-                      <button
-                        className="remove-player-btn"
-                        onClick={() => handleRemovePlayer(player.player_id)}
-                      >
-                        REMOVE
-                      </button>
-                      <button
-                        className="start-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "starter")}
-                      >
-                        START
-                      </button>
-                      <button
-                        className="dnp-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "reserve")}
-                      >
-                        DNP
-                      </button>
-                    </div>
+                    {!rosterLocked && (
+                      <div className="player-buttons">
+                        <button
+                          className="remove-player-btn"
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                        >
+                          REMOVE
+                        </button>
+                        <button
+                          className="start-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "starter")}
+                        >
+                          START
+                        </button>
+                        <button
+                          className="dnp-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                        >
+                          DNP
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))
               ) : (
@@ -197,26 +291,28 @@ function PlayerDashboardRoster() {
                     <div className="player-info">
                       <strong>{player.player}</strong> ({player.pos}) - ${player.salary}
                     </div>
-                    <div className="player-buttons">
-                      <button
-                        className="remove-player-btn"
-                        onClick={() => handleRemovePlayer(player.player_id)}
-                      >
-                        REMOVE
-                      </button>
-                      <button
-                        className="bench-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "bench")}
-                      >
-                        BENCH
-                      </button>
-                      <button
-                        className="start-btn"
-                        onClick={() => handleChangeCategory(player.player_id, "starter")}
-                      >
-                        START
-                      </button>
-                    </div>
+                    {!rosterLocked && (
+                      <div className="player-buttons">
+                        <button
+                          className="remove-player-btn"
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                        >
+                          REMOVE
+                        </button>
+                        <button
+                          className="bench-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "bench")}
+                        >
+                          BENCH
+                        </button>
+                        <button
+                          className="start-btn"
+                          onClick={() => handleChangeCategory(player.player_id, "starter")}
+                        >
+                          START
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))
               ) : (
@@ -246,12 +342,14 @@ function PlayerDashboardRoster() {
         </div>
       </div>
 
-      {/* Footer Button: Save Lineup */}
-      <div className="lineup-buttons">
-        <button className="save-btn" onClick={handleSaveLineup}>
-          Save Lineup
-        </button>
-      </div>
+      {/* Footer Button: Save Lineup (only if roster is not locked) */}
+      {!rosterLocked && (
+        <div className="lineup-buttons">
+          <button className="save-btn" onClick={handleSaveLineup}>
+            Save Lineup
+          </button>
+        </div>
+      )}
     </div>
   );
 }
