@@ -111,9 +111,23 @@ app.post("/logout", (req, res) => {
 
 // GET /freeagents endpoint to fetch available players
 app.get("/freeagents", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+
+  const userId = req.user.user_id;
   try {
+    // First, get the user's league.
+    const teamResult = await pool.query("SELECT league_id FROM teams WHERE user_id = $1", [userId]);
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "User's team not found" });
+    }
+    const { league_id } = teamResult.rows[0];
+    
+    // Now fetch players for that league that are not picked.
     const result = await pool.query(
-      "SELECT * FROM players WHERE player_picked = false;"
+      "SELECT * FROM players WHERE player_picked = false AND league_id = $1",
+      [league_id]
     );
     res.json(result.rows);
   } catch (err) {
@@ -121,6 +135,8 @@ app.get("/freeagents", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 // GET /roster endpoint to fetch the current user's roster
 // GET /roster endpoint to fetch the current user's roster with daily schedule
@@ -147,13 +163,14 @@ app.get("/roster", async (req, res) => {
 SELECT 
   r.team_id, 
   r.player_id, 
-  p.player AS player_name,
+  p.player AS player_name,  -- alias the players.player field as player_name
   p.pos,
   p.salary,
   COALESCE(rs.category, r.category) AS category,
   pgp.roster_picked
 FROM rosters r
-JOIN players p ON r.player_id = p.player_id
+JOIN players p 
+  ON r.player_id = p.player_id
 LEFT JOIN roster_schedule rs 
   ON r.team_id = rs.team_id 
   AND r.player_id = rs.player_id 
@@ -163,6 +180,7 @@ LEFT JOIN player_games_played pgp
   AND pgp.game_date_played = $1
 WHERE r.team_id = $2
 ORDER BY p.player ASC;
+
 `,
       [gameDate, teamId]
     );
@@ -338,18 +356,24 @@ app.get("/trade-setup", async (req, res) => {
       return res.status(404).json({ error: "User's team not found" });
     }
     const { team_id: myTeamId, league_id } = teamResult.rows[0];
+
+    // Get all teams in the same league.
     const teamsResult = await pool.query(
       `SELECT team_id, team_name FROM teams WHERE league_id = $1`,
       [league_id]
     );
+
+    // Get rosters for all teams in the league, but only for players that belong to that league.
     const rostersResult = await pool.query(
       `SELECT r.team_id, r.player_id, r.category, p.player AS player_name, p.pos, p.salary
        FROM rosters r
        JOIN players p ON r.player_id = p.player_id
        JOIN teams t ON r.team_id = t.team_id
-       WHERE t.league_id = $1`,
+       WHERE t.league_id = $1
+         AND p.league_id = $1`,
       [league_id]
     );
+
     res.json({
       myTeamId,
       teams: teamsResult.rows,
@@ -360,6 +384,7 @@ app.get("/trade-setup", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // POST /execute-trade endpoint to execute a trade
 app.post("/execute-trade", async (req, res) => {
@@ -412,6 +437,7 @@ app.get("/matchup-season", async (req, res) => {
   }
 
   try {
+    // Retrieve the logged-in user's team and league.
     const userId = req.user.user_id;
     const teamResult = await pool.query(
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
@@ -422,6 +448,7 @@ app.get("/matchup-season", async (req, res) => {
     }
     const { team_id, league_id } = teamResult.rows[0];
 
+    // Find an active (or upcoming) matchup for the user's league that includes their team.
     const matchupQuery = `
       SELECT 
         m.matchup_id,
@@ -447,7 +474,8 @@ app.get("/matchup-season", async (req, res) => {
     }
     const matchup = matchupResult.rows[0];
 
-    // Build the stats query (using only player_games_played)
+    // Build a date series from matchup start_date to end_date.
+    // Then, combine the game stats from player_games_played.
     const statsQuery = `
       WITH date_series AS (
         SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
