@@ -12,6 +12,8 @@ import FreeAgents from "./FreeAgents";
 import PlayerDashboardRoster from "./PlayerDashboardRoster"; 
 import LoginPage from "./LoginPage"; 
 import PrivateDashboard from "./PrivateDashboard"; 
+import PracticeDraft from "./PracticeFantasyDraft"; 
+import LiveDraftPage from "./LiveDraftPage"; 
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -67,6 +69,8 @@ function App() {
               <Route path="/player-trade-machine" element={<PrivateDashboard isLoggedIn={isLoggedIn}><PlayerTradeMachine /></PrivateDashboard>} />
               <Route path="/player-league" element={<PrivateDashboard isLoggedIn={isLoggedIn}><PlayerLeague /></PrivateDashboard>} />
               <Route path="/free-agents" element={<PrivateDashboard isLoggedIn={isLoggedIn}><FreeAgents /></PrivateDashboard>} />
+              <Route path="/practice-draft" element={<PracticeDraft />} />
+              <Route path="/live-draft-page" element={<LiveDraftPage />} />
             </Routes>
           </main>
         </Router>

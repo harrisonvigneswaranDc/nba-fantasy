@@ -1,12 +1,10 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router-dom"; // Import Link
 import "./HomePage.css";
 import Header from "./Header";
 
 function HomePage() {
   return (
-    <div>
-    
     <div className="home-page">
       <Header />
 
@@ -40,14 +38,22 @@ function HomePage() {
               <input type="text" placeholder="[ Enter Code ]" className="enter-code-input" />
             </div>
             <div className="action-box">
+              <Link to="./live-draft-page">
               <button className="create-league-btn">Create a League</button>
+              </Link>
               <p>"Be a commissioner, set the rules, invite your friends to play"</p>
             </div>
           </div>
         </section>
 
-        
-        
+        {/* Navigation to Draft Board */}
+        <section className="draft-navigation">
+          <h2>Practice Your Fantasy Draft</h2>
+          <Link to="./practice-draft">
+            <button className="practice-draft-btn">Start Practice Draft</button>
+          </Link>
+        </section>
+
       </div>
 
       {/* Footer Area */}
@@ -56,7 +62,6 @@ function HomePage() {
         <span>[Terms of Service]</span>
         <span>[Contact]</span>
       </footer>
-    </div>
     </div>
   );
 }

@@ -109,6 +109,7 @@ app.post("/logout", (req, res) => {
   });
 });
 
+
 // GET /freeagents endpoint to fetch available players
 app.get("/freeagents", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
@@ -574,8 +575,161 @@ app.get("/league-info", async (req, res) => {
   }
 });
 
+app.post("/reset-draft", async (req, res) => {
+  // If you only have one league, you can hard-code it. Otherwise, pass leagueId in req.body
+  const { leagueId } = req.body; // or a default if only 1 league
+
+  try {
+    await pool.query("BEGIN");
+
+    // 1) Clear rosters for the league’s teams
+    //    We can either delete from rosters using a subselect for the team_id in that league
+    await pool.query(`
+      DELETE FROM rosters
+      WHERE team_id IN (
+        SELECT team_id FROM teams WHERE league_id = $1
+      )
+    `, [leagueId]);
+
+    // 2) Clear roster_schedule for those same teams
+    await pool.query(`
+      DELETE FROM roster_schedule
+      WHERE team_id IN (
+        SELECT team_id FROM teams WHERE league_id = $1
+      )
+    `, [leagueId]);
+
+    // 3) Set all players in this league to player_picked = false
+    await pool.query(`
+      UPDATE players
+      SET player_picked = false
+      WHERE league_id = $1
+    `, [leagueId]);
+
+    await pool.query("COMMIT");
+    res.json({ success: true, message: "Draft reset successfully." });
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    console.error("Error resetting draft:", error);
+    res.status(500).json({ error: "Error resetting draft." });
+  }
+});
+
+app.post("/make-pick", async (req, res) => {
+  const { teamId, playerId } = req.body;
+  
+  try {
+    await pool.query("BEGIN");
+
+    // 1. Retrieve the league id from the team record.
+    const teamResult = await pool.query(
+      "SELECT league_id FROM teams WHERE team_id = $1",
+      [teamId]
+    );
+    if (teamResult.rows.length === 0) {
+      throw new Error("Team not found.");
+    }
+    const leagueId = teamResult.rows[0].league_id;
+
+    // 2. Verify that the player is available (not picked yet) in this league.
+    const playerResult = await pool.query(
+      "SELECT player_picked FROM players WHERE player_id = $1 AND league_id = $2",
+      [playerId, leagueId]
+    );
+    if (playerResult.rows.length === 0) {
+      throw new Error("Player not found in this league.");
+    }
+    if (playerResult.rows[0].player_picked) {
+      throw new Error("Player has already been picked.");
+    }
+
+    // 3. Determine the category based on how many players the team already has.
+    const rosterCountResult = await pool.query("SELECT COUNT(*) AS cnt FROM rosters WHERE team_id = $1", [teamId]);
+const count = parseInt(rosterCountResult.rows[0].cnt, 10);
+let category;
+if (count < 5) {
+  category = "starter";
+} else if (count < 9) {
+  category = "bench";
+} else if (count < 15) {
+  category = "reserve";
+} else {
+  throw new Error("Team already has 15 players.");
+}
 
 
+    // 4. Update the player's record: mark player_picked as true.
+    await pool.query(
+      "UPDATE players SET player_picked = true WHERE player_id = $1 AND league_id = $2",
+      [playerId, leagueId]
+    );
+
+    // 5. Insert the pick into the rosters table.
+    await pool.query(
+      "INSERT INTO rosters (team_id, player_id, category) VALUES ($1, $2, $3)",
+      [teamId, playerId, category]
+    );
+
+    // 6. Insert or update the roster_schedule for a specific schedule date.
+    // Here we set the schedule_date as '2025-01-20'.
+    await pool.query(
+      `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (team_id, player_id, schedule_date)
+       DO UPDATE SET category = EXCLUDED.category;`,
+      [teamId, playerId, "2025-01-20", category]
+    );
+
+    await pool.query("COMMIT");
+    res.json({ success: true });
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    console.error("Error making pick:", error);
+    res.status(500).json({ error: error.message || "Error processing pick." });
+  }
+});
+
+// API endpoint: Get teams for a given league
+app.get("/teams-for-league", async (req, res) => {
+  // Expect leagueId to be passed as a query parameter
+  const { leagueId } = req.query;
+  if (!leagueId) {
+    return res.status(400).json({ error: "leagueId is required" });
+  }
+  
+  try {
+    // Query the teams table for the specified leagueId
+    const result = await pool.query(
+      "SELECT team_id, team_name, user_id FROM teams WHERE league_id = $1 ORDER BY team_id",
+      [leagueId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching teams:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /league-players endpoint
+app.get("/league-players", async (req, res) => {
+  // Expect leagueId to be provided as a query parameter
+  const { leagueId } = req.query;
+  if (!leagueId) {
+    return res.status(400).json({ error: "leagueId is required" });
+  }
+
+  try {
+    // Query players table for players in this league that have not been picked
+    const result = await pool.query(
+      "SELECT player, pos, rb, ast, stl, blk, tov, pf, pts, player_id, salary, player_picked FROM players WHERE league_id = $1 AND player_picked = false",
+      [leagueId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching players:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 
 

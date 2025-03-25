@@ -1,0 +1,281 @@
+/* Global styles */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f5f5f5;
+  font-family: "Helvetica", Arial, sans-serif;
+  font-size: 16px;
+  color: #333;
+}
+
+.draft-board {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Section */
+.draft-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.logo {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #222;
+}
+
+.draft-info span {
+  margin-left: 20px;
+  font-size: 1rem;
+  color: #666;
+}
+
+/* Main Content Area: Left & Center Panels */
+.main-content {
+  display: flex;
+  gap: 20px;
+}
+
+/* Left Panel: Available Players */
+.left-panel {
+  flex: 1;
+  background-color: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.left-panel h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+  color: #444;
+}
+
+/* Table for Available Players */
+.players-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.players-table th,
+.players-table td {
+  text-align: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.players-table th {
+  background-color: #f2f2f2;
+  font-weight: 600;
+  color: #555;
+}
+
+.players-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* Center Panel: Draft Board */
+.center-panel {
+  flex: 1.5;
+  background-color: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.center-panel h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+  color: #444;
+}
+
+/* Styled Containers for Draft Order and Pick History */
+.draft-order-container,
+.pick-history-container {
+  background-color: #fff;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.draft-order-container ol,
+.pick-history-container ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.draft-order-container li,
+.pick-history-container li {
+  text-align: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.draft-order-container li:last-child,
+.pick-history-container li:last-child {
+  border-bottom: none;
+}
+
+.draft-order-container li:nth-child(even),
+.pick-history-container li:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* Add scrolling to pick history container (show roughly 3 rounds) */
+.pick-history-container {
+  max-height: 300px; /* Adjust this value as needed */
+  overflow-y: auto;
+}
+
+/* My Team Section */
+.my-team {
+  margin-top: 30px;
+  background-color: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.my-team h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+  color: #444;
+}
+
+/* Team Roster Table */
+.team-roster {
+  overflow-x: auto;
+}
+
+.team-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.team-table th,
+.team-table td {
+  text-align: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.team-table th {
+  background-color: #f2f2f2;
+  font-weight: 600;
+  color: #555;
+}
+
+/* Roster Group Headings */
+.roster-group h3 {
+  margin: 20px 0 10px;
+  font-size: 1.1rem;
+  color: #444;
+}
+
+/* Salary Cap (Budget) Indicator */
+.salary-cap {
+  margin-top: 20px;
+}
+
+.salary-cap-info {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.salary-cap-bar {
+  width: 100%;
+  background-color: #eee;
+  height: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.salary-cap-progress {
+  height: 100%;
+  background-color: #4caf50;
+  width: 0%; /* Inline style in JS sets actual width */
+  border-radius: 8px 0 0 8px;
+  transition: width 0.3s ease;
+}
+
+/* Buttons */
+button {
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: #007bff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Dropdowns */
+select {
+  padding: 8px 12px;
+  font-size: 1rem;
+  color: #333;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-right: 10px;
+}
+
+select:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+/* Inputs */
+input[type="text"] {
+  padding: 8px 12px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  transition: border-color 0.2s ease;
+  margin-right: 10px;
+}
+
+input[type="text"]:focus {
+  border-color: #007bff;
+  outline: none;
+}
