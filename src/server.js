@@ -576,14 +576,12 @@ app.get("/league-info", async (req, res) => {
 });
 
 app.post("/reset-draft", async (req, res) => {
-  // If you only have one league, you can hard-code it. Otherwise, pass leagueId in req.body
-  const { leagueId } = req.body; // or a default if only 1 league
+  const { leagueId } = req.body;
 
   try {
     await pool.query("BEGIN");
 
     // 1) Clear rosters for the league’s teams
-    //    We can either delete from rosters using a subselect for the team_id in that league
     await pool.query(`
       DELETE FROM rosters
       WHERE team_id IN (
@@ -606,6 +604,13 @@ app.post("/reset-draft", async (req, res) => {
       WHERE league_id = $1
     `, [leagueId]);
 
+    // 4) **Reset each team's salary to 0**
+    await pool.query(`
+      UPDATE teams
+      SET team_salary = 0
+      WHERE league_id = $1
+    `, [leagueId]);
+
     await pool.query("COMMIT");
     res.json({ success: true, message: "Draft reset successfully." });
   } catch (error) {
@@ -615,13 +620,14 @@ app.post("/reset-draft", async (req, res) => {
   }
 });
 
+
 app.post("/make-pick", async (req, res) => {
   const { teamId, playerId } = req.body;
   
   try {
     await pool.query("BEGIN");
 
-    // 1. Retrieve the league id from the team record.
+    // 1. Retrieve the league from the team
     const teamResult = await pool.query(
       "SELECT league_id FROM teams WHERE team_id = $1",
       [teamId]
@@ -631,9 +637,9 @@ app.post("/make-pick", async (req, res) => {
     }
     const leagueId = teamResult.rows[0].league_id;
 
-    // 2. Verify that the player is available (not picked yet) in this league.
+    // 2. Verify the player is in this league and not yet picked
     const playerResult = await pool.query(
-      "SELECT player_picked FROM players WHERE player_id = $1 AND league_id = $2",
+      "SELECT player_picked, salary FROM players WHERE player_id = $1 AND league_id = $2",
       [playerId, leagueId]
     );
     if (playerResult.rows.length === 0) {
@@ -643,35 +649,38 @@ app.post("/make-pick", async (req, res) => {
       throw new Error("Player has already been picked.");
     }
 
-    // 3. Determine the category based on how many players the team already has.
-    const rosterCountResult = await pool.query("SELECT COUNT(*) AS cnt FROM rosters WHERE team_id = $1", [teamId]);
-const count = parseInt(rosterCountResult.rows[0].cnt, 10);
-let category;
-if (count < 5) {
-  category = "starter";
-} else if (count < 9) {
-  category = "bench";
-} else if (count < 15) {
-  category = "reserve";
-} else {
-  throw new Error("Team already has 15 players.");
-}
+    const playerSalary = parseFloat(playerResult.rows[0].salary);
 
+    // 3. Determine category (starter, bench, reserve)
+    const rosterCountResult = await pool.query(
+      "SELECT COUNT(*) AS cnt FROM rosters WHERE team_id = $1",
+      [teamId]
+    );
+    const count = parseInt(rosterCountResult.rows[0].cnt, 10);
+    let category;
+    if (count < 5) {
+      category = "starter";
+    } else if (count < 9) {
+      category = "bench";
+    } else if (count < 15) {
+      category = "reserve";
+    } else {
+      throw new Error("Team already has 15 players.");
+    }
 
-    // 4. Update the player's record: mark player_picked as true.
+    // 4. Mark the player as picked
     await pool.query(
       "UPDATE players SET player_picked = true WHERE player_id = $1 AND league_id = $2",
       [playerId, leagueId]
     );
 
-    // 5. Insert the pick into the rosters table.
+    // 5. Insert row into rosters
     await pool.query(
       "INSERT INTO rosters (team_id, player_id, category) VALUES ($1, $2, $3)",
       [teamId, playerId, category]
     );
 
-    // 6. Insert or update the roster_schedule for a specific schedule date.
-    // Here we set the schedule_date as '2025-01-20'.
+    // 6. Insert or update roster_schedule
     await pool.query(
       `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
        VALUES ($1, $2, $3, $4)
@@ -679,6 +688,13 @@ if (count < 5) {
        DO UPDATE SET category = EXCLUDED.category;`,
       [teamId, playerId, "2025-01-20", category]
     );
+
+    // 7. **Update the team's salary** in the teams table
+    await pool.query(`
+      UPDATE teams
+      SET team_salary = team_salary + $1
+      WHERE team_id = $2
+    `, [playerSalary, teamId]);
 
     await pool.query("COMMIT");
     res.json({ success: true });

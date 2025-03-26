@@ -36,7 +36,8 @@ const LiveDraftComponent = () => {
   const TOTAL_ROUNDS = 15;
   const navigate = useNavigate();
 
-  // Draft state
+  // ---------------------------
+  // State Hooks
   const [currentRound, setCurrentRound] = useState(1);
   const [draftingTeam, setDraftingTeam] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -68,6 +69,9 @@ const LiveDraftComponent = () => {
   // Fetched teams from the league (expected 2 teams)
   const [teams, setTeams] = useState([]);
 
+  // Roster view: cycle through teams
+  const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
+
   // ---------------------------
   // Fetch teams for this league
   useEffect(() => {
@@ -76,16 +80,24 @@ const LiveDraftComponent = () => {
     })
       .then((res) => res.json())
       .then((data) => {
-        setTeams(data); // Expected format: [{ team_id, team_name, user_id }, ...]
+        setTeams(data); // Expected format: [{ team_id, team_name, user_id, team_salary? }, ...]
         const teamIds = data.map((team) => team.team_id);
         setParticipants(teamIds);
-        if (teamIds.length > 0) setDraftingTeam(teamIds[0]);
+
+        if (teamIds.length > 0) {
+          setDraftingTeam(teamIds[0]);
+        }
+
         // Initialize rosters and salary caps for each team
         const initialRosters = {};
         const initialCaps = {};
         teamIds.forEach((id) => {
           initialRosters[id] = [];
-          initialCaps[id] = { used: 0, totalBudget: SALARY_CAP_RULES.totalBudget };
+          // We'll start used=0 locally; the server will override as picks are made
+          initialCaps[id] = {
+            used: 0,
+            totalBudget: SALARY_CAP_RULES.totalBudget,
+          };
         });
         setRosters(initialRosters);
         setTeamSalaryCaps(initialCaps);
@@ -115,19 +127,19 @@ const LiveDraftComponent = () => {
   }, [allPlayers, isDraftStarted]);
 
   // ---------------------------
-  // Filter players by search query (ensuring we use correct property names)
+  // Filter players by search query
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
-      // p.player is the name from the DB
-      const name = p.player || "";
-      const pos = p.pos || "";
+      const name = p.player?.toLowerCase() || "";
+      const pos = p.pos?.toLowerCase() || "";
       return (
-        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pos.toLowerCase().includes(searchQuery.toLowerCase())
+        name.includes(searchQuery.toLowerCase()) ||
+        pos.includes(searchQuery.toLowerCase())
       );
     });
   }, [players, searchQuery]);
 
+  // ---------------------------
   // Sorting players by selected criteria
   const sortedPlayers = useMemo(() => {
     let sorted = [...filteredPlayers];
@@ -145,13 +157,19 @@ const LiveDraftComponent = () => {
     return sorted;
   }, [filteredPlayers, sortCriteria]);
 
-  // Optionally restrict available players if the drafting team is in the "Second Apron"
-  const currentDraftingTeamUsed = teamSalaryCaps[draftingTeam]?.used || 0;
+  // ---------------------------
+  // Determine if drafting team is above the second apron
+  // and optionally restrict available players
+  const currentDraftingTeamUsed =
+    teamSalaryCaps[draftingTeam]?.used ?? 0; // fallback to 0
   const currentDraftingTeamStage = getCapStage(currentDraftingTeamUsed);
-  const availablePlayers =
-    currentDraftingTeamStage === "Second Apron (Hard Cap)"
-      ? sortedPlayers.filter((p) => p.salary <= 5000000)
-      : sortedPlayers;
+
+  const availablePlayers = useMemo(() => {
+    if (currentDraftingTeamStage === "Second Apron (Hard Cap)") {
+      return sortedPlayers.filter((p) => p.salary <= 5000000);
+    }
+    return sortedPlayers;
+  }, [sortedPlayers, currentDraftingTeamStage]);
 
   // ---------------------------
   // Timer logic for draft countdown
@@ -175,24 +193,27 @@ const LiveDraftComponent = () => {
     nextPicker();
   };
 
+  // Move to next team or next round
   const nextPicker = () => {
     if (currentPickerIndex + 1 < participants.length) {
-      setCurrentPickerIndex(currentPickerIndex + 1);
+      setCurrentPickerIndex((prev) => prev + 1);
       setDraftingTeam(participants[currentPickerIndex + 1]);
       setTimeLeft(10);
     } else {
+      // We finished this round
       if (currentRound < TOTAL_ROUNDS) {
-        setCurrentRound(currentRound + 1);
+        setCurrentRound((prev) => prev + 1);
         setCurrentPickerIndex(0);
         setDraftingTeam(participants[0]);
         setTimeLeft(10);
       } else {
+        // All rounds complete
         endDraft();
       }
     }
   };
 
-  // Helper to determine category based on current roster length (local, for display)
+  // Local helper: decide category for new pick
   const determineCategory = (teamId) => {
     const count = rosters[teamId]?.length || 0;
     if (count < 5) return "starter";
@@ -206,22 +227,27 @@ const LiveDraftComponent = () => {
   const handlePick = async (playerName) => {
     if (!isDraftStarted) return;
     const currentParticipant = participants[currentPickerIndex];
+
+    // Find the chosen player
     const playerIndex = players.findIndex((p) => p.player === playerName);
     if (playerIndex === -1) return;
     const chosenPlayer = players[playerIndex];
 
-    // Check if the team budget would be exceeded
-    const currentUsed = Number(teamSalaryCaps[currentParticipant]?.used) || 0;
-    const newUsed = currentUsed + Number(chosenPlayer.salary);
+    // Quick local check if the budget would be exceeded
+    const currentUsed = parseFloat(teamSalaryCaps[currentParticipant]?.used ?? 0);
+    const playerSalary = parseFloat(chosenPlayer.salary || 0);
+    const tempNewUsed = currentUsed + playerSalary;
 
-    if (newUsed > teamSalaryCaps[currentParticipant].totalBudget) {
+    // Compare to totalBudget
+    const totalBudget = parseFloat(teamSalaryCaps[currentParticipant]?.totalBudget ?? SALARY_CAP_RULES.totalBudget);
+    if (tempNewUsed > totalBudget) {
       alert(
-        `Cannot pick ${chosenPlayer.player}: That would bring payroll to $${newUsed.toLocaleString()}, exceeding your budget of $${teamSalaryCaps[currentParticipant].totalBudget.toLocaleString()}.`
+        `Cannot pick ${chosenPlayer.player}: That would bring payroll to $${tempNewUsed.toLocaleString()}, exceeding your budget of $${totalBudget.toLocaleString()}.`
       );
       return;
     }
 
-    // Persist the pick via the backend /make-pick endpoint
+    // Make the pick on the server
     try {
       const res = await fetch("http://localhost:3001/make-pick", {
         method: "POST",
@@ -234,52 +260,72 @@ const LiveDraftComponent = () => {
         }),
       });
       const data = await res.json();
+
       if (!res.ok) {
         alert(data.error || "Pick failed");
         return;
       }
+
+      // data.newTeamSalary is returned from the backend (if you added RETURNING in your query)
+      const updatedTotal = parseFloat(data.newTeamSalary ?? tempNewUsed);
+
+      // Update local state with the pick
+      setPickHistory((prev) => [
+        ...prev,
+        { round: currentRound, participant: currentParticipant, player: chosenPlayer.player },
+      ]);
+      setRosters((prev) => {
+        const updated = { ...prev };
+        updated[currentParticipant] = [
+          ...(updated[currentParticipant] || []),
+          { ...chosenPlayer, category: determineCategory(currentParticipant) },
+        ];
+        return updated;
+      });
+
+      // Use the server's official updated salary
+      setTeamSalaryCaps((prev) => ({
+        ...prev,
+        [currentParticipant]: {
+          ...prev[currentParticipant],
+          used: updatedTotal,
+        },
+      }));
+
+      // Remove the player from the available list
+      setPlayers((prev) => prev.filter((_, idx) => idx !== playerIndex));
+      setSearchQuery("");
+      nextPicker();
     } catch (error) {
       console.error("Error making pick:", error);
-      return;
     }
-
-    // Update local state with the pick (using the same category logic as on the server)
-    setPickHistory((prev) => [
-      ...prev,
-      { round: currentRound, participant: currentParticipant, player: chosenPlayer.player },
-    ]);
-    setRosters((prev) => {
-      const updated = { ...prev };
-      updated[currentParticipant] = [
-        ...(updated[currentParticipant] || []),
-        { ...chosenPlayer, category: determineCategory(currentParticipant) },
-      ];
-      return updated;
-    });
-    setTeamSalaryCaps((prev) => ({
-      ...prev,
-      [currentParticipant]: { ...prev[currentParticipant], used: newUsed },
-    }));
-    setPlayers((prev) => prev.filter((_, idx) => idx !== playerIndex));
-    setSearchQuery("");
-    nextPicker();
   };
 
+  // ---------------------------
   // Final pick function for teams that missed their turn
   const finalPickPlayer = async (playerName) => {
     if (!finalPickPhase || finalPickQueue.length === 0) return;
     const currentParticipant = finalPickQueue[0];
+
+    // Find the chosen player
     const playerIndex = players.findIndex((p) => p.player === playerName);
     if (playerIndex === -1) return;
     const chosenPlayer = players[playerIndex];
 
-    const currentUsed = teamSalaryCaps[currentParticipant]?.used || 0;
-    const newUsed = currentUsed + chosenPlayer.salary;
-    if (newUsed > teamSalaryCaps[currentParticipant].totalBudget) {
-      alert(`Cannot pick ${chosenPlayer.player}: exceeds team budget.`);
+    // Local budget check
+    const currentUsed = parseFloat(teamSalaryCaps[currentParticipant]?.used ?? 0);
+    const playerSalary = parseFloat(chosenPlayer.salary ?? 0);
+    const newUsed = currentUsed + playerSalary;
+    const totalBudget = parseFloat(teamSalaryCaps[currentParticipant]?.totalBudget ?? SALARY_CAP_RULES.totalBudget);
+
+    if (newUsed > totalBudget) {
+      alert(
+        `Cannot pick ${chosenPlayer.player}: That would bring payroll to $${newUsed.toLocaleString()}, exceeding your budget of $${totalBudget.toLocaleString()}.`
+      );
       return;
     }
 
+    // Make the final pick on the server
     try {
       const res = await fetch("http://localhost:3001/make-pick", {
         method: "POST",
@@ -292,39 +338,48 @@ const LiveDraftComponent = () => {
         }),
       });
       const data = await res.json();
+
       if (!res.ok) {
         alert(data.error || "Pick failed");
         return;
       }
+
+      // (If your server also returns the newTeamSalary, parse that here)
+      // const updatedTotal = parseFloat(data.newTeamSalary ?? newUsed);
+
+      // Update local state for final pick
+      setPickHistory((prev) => [
+        ...prev,
+        { round: "Final", participant: currentParticipant, player: chosenPlayer.player },
+      ]);
+      setRosters((prev) => {
+        const updated = { ...prev };
+        updated[currentParticipant] = [
+          ...(updated[currentParticipant] || []),
+          { ...chosenPlayer, category: determineCategory(currentParticipant) },
+        ];
+        return updated;
+      });
+      setTeamSalaryCaps((prev) => ({
+        ...prev,
+        [currentParticipant]: {
+          ...prev[currentParticipant],
+          used: newUsed,
+        },
+      }));
+      setPlayers((prev) => prev.filter((_, idx) => idx !== playerIndex));
+      setFinalPickQueue((prev) => {
+        const newQueue = prev.slice(1);
+        if (newQueue.length === 0) setFinalPickPhase(false);
+        return newQueue;
+      });
     } catch (error) {
       console.error("Error making final pick:", error);
       return;
     }
-
-    setPickHistory((prev) => [
-      ...prev,
-      { round: "Final", participant: currentParticipant, player: chosenPlayer.player },
-    ]);
-    setRosters((prev) => {
-      const updated = { ...prev };
-      updated[currentParticipant] = [
-        ...(updated[currentParticipant] || []),
-        { ...chosenPlayer, category: determineCategory(currentParticipant) },
-      ];
-      return updated;
-    });
-    setTeamSalaryCaps((prev) => ({
-      ...prev,
-      [currentParticipant]: { ...prev[currentParticipant], used: newUsed },
-    }));
-    setPlayers((prev) => prev.filter((_, idx) => idx !== playerIndex));
-    setFinalPickQueue((prev) => {
-      const newQueue = prev.slice(1);
-      if (newQueue.length === 0) setFinalPickPhase(false);
-      return newQueue;
-    });
   };
 
+  // ---------------------------
   // End draft: if any team has no picks, trigger final pick phase
   const endDraft = () => {
     const emptyTeams = participants.filter((p) => !rosters[p] || rosters[p].length === 0);
@@ -339,51 +394,76 @@ const LiveDraftComponent = () => {
     }
   };
 
-  // ---------------------------
-  // Roster view: cycle through teams
-  const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
+  // Handle "Next Team" button to view different rosters
   const handleNextTeam = () => {
     const teamIds = Object.keys(rosters);
     setCurrentTeamIndex((prev) => (prev + 1) % teamIds.length);
   };
 
+  // Identify the currentTeamId in the roster view
   const teamIds = Object.keys(rosters);
   const currentTeamId = teamIds[currentTeamIndex] || "";
   const currentRoster = rosters[currentTeamId] || [];
-  const currentTeamSalaryCap =
-    teamSalaryCaps[currentTeamId] || { used: 0, totalBudget: SALARY_CAP_RULES.totalBudget };
 
+  // Pull the team's salary info (with fallback)
+  const currentTeamSalaryCap =
+    teamSalaryCaps[currentTeamId] || {
+      used: 0,
+      totalBudget: SALARY_CAP_RULES.totalBudget,
+    };
+
+  // Convert them to real numbers so .toLocaleString() won't fail
+  const payroll = parseFloat(currentTeamSalaryCap.used ?? 0);
+  const budget = parseFloat(currentTeamSalaryCap.totalBudget ?? SALARY_CAP_RULES.totalBudget);
+
+  // ---------------------------
   // Calculate payroll and tax tiers for display
-  const payroll = currentTeamSalaryCap.used;
-  const tier1Excess = payroll > SALARY_CAP_RULES.softCap ? Math.min(payroll - SALARY_CAP_RULES.softCap, 31000000) : 0;
+  const tier1Excess =
+    payroll > SALARY_CAP_RULES.softCap
+      ? Math.min(payroll - SALARY_CAP_RULES.softCap, 31000000)
+      : 0;
   const tier1Tax = tier1Excess * 1.5;
-  const tier2Excess = payroll > SALARY_CAP_RULES.firstApron ? Math.min(payroll - SALARY_CAP_RULES.firstApron, 11000000) : 0;
+
+  const tier2Excess =
+    payroll > SALARY_CAP_RULES.firstApron
+      ? Math.min(payroll - SALARY_CAP_RULES.firstApron, 11000000)
+      : 0;
   const tier2Tax = tier2Excess * 2;
-  const tier3Excess = payroll > SALARY_CAP_RULES.hardCap ? payroll - SALARY_CAP_RULES.hardCap : 0;
+
+  const tier3Excess =
+    payroll > SALARY_CAP_RULES.hardCap
+      ? payroll - SALARY_CAP_RULES.hardCap
+      : 0;
   const tier3Tax = tier3Excess * 3;
+
   const totalTax = tier1Tax + tier2Tax + tier3Tax;
 
-  // Split current roster into groups for display (first 5 = starters, next 4 = bench, last 6 = DNP)
+  // ---------------------------
+  // Split current roster into groups for display
   const starters = currentRoster.slice(0, 5);
   const bench = currentRoster.slice(5, 9);
   const dnp = currentRoster.slice(9, 15);
 
   // ---------------------------
-  // Start Draft Handler: initializes draft state
+  // Start Draft Handler
   const handleStartDraft = () => {
-    // Optionally exclude specific players by name
+    // Optionally exclude certain players
     const namesToExclude = ["Sarah", "You", "Michael", "Samantha"];
     setPlayers(allPlayers.filter((player) => !namesToExclude.includes(player.player)));
-    // For this live draft, participants are already fetched from teams
     setCurrentPickerIndex(0);
-    if (participants.length > 0) setDraftingTeam(participants[0]);
+
+    if (participants.length > 0) {
+      setDraftingTeam(participants[0]);
+    }
+
     setCurrentRound(1);
     setTimeLeft(10);
     setIsDraftStarted(true);
     setPickHistory([]);
   };
 
-  // Reset Draft: calls backend to clear rosters, schedule, and reset player_picked flags
+  // ---------------------------
+  // Reset Draft Handler
   const handleResetDraft = async () => {
     try {
       const res = await fetch("http://localhost:3001/reset-draft", {
@@ -398,6 +478,7 @@ const LiveDraftComponent = () => {
         return;
       }
       alert("Draft reset successfully!");
+      // Reload or refresh page state
       window.location.reload();
     } catch (error) {
       console.error("Error resetting draft:", error);
@@ -406,7 +487,7 @@ const LiveDraftComponent = () => {
   };
 
   // ---------------------------
-  // Render the component UI
+  // Render the component
   return (
     <div className="draft-board">
       <header className="draft-header">
@@ -416,7 +497,9 @@ const LiveDraftComponent = () => {
         </button>
         {!finalPickPhase && draftingTeam && (
           <div className="draft-info">
-            <span>Round: {currentRound} / {TOTAL_ROUNDS}</span>
+            <span>
+              Round: {currentRound} / {TOTAL_ROUNDS}
+            </span>
             <span>Drafting Team: {draftingTeam}</span>
             <span>Time Left: {timeLeft}s</span>
           </div>
@@ -444,7 +527,10 @@ const LiveDraftComponent = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <select value={sortCriteria} onChange={(e) => setSortCriteria(e.target.value)}>
+            <select
+              value={sortCriteria}
+              onChange={(e) => setSortCriteria(e.target.value)}
+            >
               <option value="position">Sort by Position</option>
               <option value="salary">Sort by Salary</option>
               <option value="ppg">Sort by PPG</option>
@@ -471,7 +557,11 @@ const LiveDraftComponent = () => {
                     <td>{player.rank}</td>
                     <td
                       style={{ color: "#007bff", cursor: "pointer" }}
-                      onClick={() => finalPickPhase ? finalPickPlayer(player.player) : handlePick(player.player)}
+                      onClick={() =>
+                        finalPickPhase
+                          ? finalPickPlayer(player.player)
+                          : handlePick(player.player)
+                      }
                     >
                       {player.player}
                     </td>
@@ -479,7 +569,11 @@ const LiveDraftComponent = () => {
                     <td>{player.pts}</td>
                     <td>{player.rb}</td>
                     <td>{player.ast}</td>
-                    <td>${(player.salary / 1_000_000).toLocaleString()}M</td>
+                    <td>
+                      $
+                      {(parseFloat(player.salary ?? 0) / 1_000_000).toLocaleString()}
+                      M
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -494,8 +588,16 @@ const LiveDraftComponent = () => {
                 <h2>Draft Order (This Round)</h2>
                 <ol>
                   {participants.map((p, idx) => (
-                    <li key={p} style={{ fontWeight: idx === currentPickerIndex ? "bold" : "normal" }}>
-                      {p} {idx === currentPickerIndex && isDraftStarted ? "(On the clock)" : ""}
+                    <li
+                      key={p}
+                      style={{
+                        fontWeight: idx === currentPickerIndex ? "bold" : "normal",
+                      }}
+                    >
+                      {p}{" "}
+                      {idx === currentPickerIndex && isDraftStarted
+                        ? "(On the clock)"
+                        : ""}
                     </li>
                   ))}
                 </ol>
@@ -506,7 +608,10 @@ const LiveDraftComponent = () => {
                   <ul>
                     {pickHistory.map((pick, idx) => (
                       <li key={idx}>
-                        {pick.round === "Final" ? "Final Pick" : `Round ${pick.round}`}: {pick.participant} picked {pick.player}
+                        {pick.round === "Final"
+                          ? "Final Pick"
+                          : `Round ${pick.round}`}
+                        : {pick.participant} picked {pick.player}
                       </li>
                     ))}
                   </ul>
@@ -518,7 +623,11 @@ const LiveDraftComponent = () => {
       </div>
 
       <section className="my-team">
-        <h2>Team: {teams.find(t => t.team_id === currentTeamId)?.team_name || currentTeamId}</h2>
+        <h2>
+          Team:{" "}
+          {teams.find((t) => t.team_id === currentTeamId)?.team_name ||
+            currentTeamId}
+        </h2>
         <div className="team-roster">
           <div className="roster-group">
             <h3>Starters (First 5 Picks)</h3>
@@ -536,7 +645,11 @@ const LiveDraftComponent = () => {
                     <tr key={`starter-${i}`}>
                       <td>{p.pos}</td>
                       <td>{p.player}</td>
-                      <td>${(p.salary / 1_000_000).toLocaleString()}M</td>
+                      <td>
+                        $
+                        {(parseFloat(p.salary ?? 0) / 1_000_000).toLocaleString()}
+                        M
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -561,7 +674,11 @@ const LiveDraftComponent = () => {
                     <tr key={`bench-${i}`}>
                       <td>{p.pos}</td>
                       <td>{p.player}</td>
-                      <td>${(p.salary / 1_000_000).toLocaleString()}M</td>
+                      <td>
+                        $
+                        {(parseFloat(p.salary ?? 0) / 1_000_000).toLocaleString()}
+                        M
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -586,7 +703,11 @@ const LiveDraftComponent = () => {
                     <tr key={`dnp-${i}`}>
                       <td>{p.pos}</td>
                       <td>{p.player}</td>
-                      <td>${(p.salary / 1_000_000).toLocaleString()}M</td>
+                      <td>
+                        $
+                        {(parseFloat(p.salary ?? 0) / 1_000_000).toLocaleString()}
+                        M
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -598,28 +719,51 @@ const LiveDraftComponent = () => {
         </div>
         <div className="salary-cap" style={{ marginTop: "10px" }}>
           <div className="salary-cap-info">
-            Budget: (${currentTeamSalaryCap.used.toLocaleString()} used / ${currentTeamSalaryCap.totalBudget.toLocaleString()})
+            Budget: (${payroll.toLocaleString()} used / {budget.toLocaleString()})
             <br />
-            Current Cap Stage: {getCapStage(currentTeamSalaryCap.used)}
+            Current Cap Stage: {getCapStage(payroll)}
           </div>
           <div className="salary-cap-bar">
-            <div className="salary-cap-progress" style={{ width: `${(currentTeamSalaryCap.used / currentTeamSalaryCap.totalBudget) * 100}%` }}></div>
+            <div
+              className="salary-cap-progress"
+              style={{
+                width: `${(payroll / budget) * 100}%`,
+              }}
+            ></div>
           </div>
           <div style={{ marginTop: "10px", fontSize: "0.95rem", color: "#444" }}>
             <div>
               <strong>Tier 1 (Over Soft Cap $140M, max 31M taxable):</strong>{" "}
-              ${Math.min(Math.max(payroll - SALARY_CAP_RULES.softCap, 0), 31000000).toLocaleString()} taxed at 1.5× = ${(Math.min(Math.max(payroll - SALARY_CAP_RULES.softCap, 0), 31000000) * 1.5).toLocaleString()}
+              {Math.min(Math.max(payroll - SALARY_CAP_RULES.softCap, 0), 31000000)
+                .toLocaleString()}{" "}
+              taxed at 1.5× ={" "}
+              {(
+                Math.min(Math.max(payroll - SALARY_CAP_RULES.softCap, 0), 31000000) *
+                1.5
+              ).toLocaleString()}
             </div>
             <div>
               <strong>Tier 2 (From $178M to $189M, max 11M taxable):</strong>{" "}
-              ${Math.min(Math.max(payroll - SALARY_CAP_RULES.firstApron, 0), 11000000).toLocaleString()} taxed at 2× = ${(Math.min(Math.max(payroll - SALARY_CAP_RULES.firstApron, 0), 11000000) * 2).toLocaleString()}
+              {Math.min(Math.max(payroll - SALARY_CAP_RULES.firstApron, 0), 11000000)
+                .toLocaleString()}{" "}
+              taxed at 2× ={" "}
+              {(
+                Math.min(
+                  Math.max(payroll - SALARY_CAP_RULES.firstApron, 0),
+                  11000000
+                ) * 2
+              ).toLocaleString()}
             </div>
             <div>
               <strong>Tier 3 (Above $189M):</strong>{" "}
-              ${Math.max(payroll - SALARY_CAP_RULES.hardCap, 0).toLocaleString()} taxed at 3× = ${(Math.max(payroll - SALARY_CAP_RULES.hardCap, 0) * 3).toLocaleString()}
+              {Math.max(payroll - SALARY_CAP_RULES.hardCap, 0).toLocaleString()}{" "}
+              taxed at 3× ={" "}
+              {(
+                Math.max(payroll - SALARY_CAP_RULES.hardCap, 0) * 3
+              ).toLocaleString()}
             </div>
             <div>
-              <strong>Total Tax:</strong> {(tier1Tax + tier2Tax + tier3Tax).toLocaleString()}
+              <strong>Total Tax:</strong> {totalTax.toLocaleString()}
             </div>
           </div>
         </div>
@@ -632,3 +776,4 @@ const LiveDraftComponent = () => {
 };
 
 export default LiveDraftComponent;
+
