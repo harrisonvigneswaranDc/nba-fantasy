@@ -4,6 +4,7 @@ import Header from "./Header";
 
 function PlayerDashboardRoster() {
   const [roster, setRoster] = useState([]);
+  const [gamesPlayed, setGamesPlayed] = useState([]); // NEW STATE
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
@@ -60,12 +61,33 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
+  const fetchGamesPlayed = () => {
+    setLoading(true);
+    fetch("http://localhost:3001/games-played", { credentials: "include" }) // No gameDate needed here
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return response.json();
+      })
+      .then((data) => setGamesPlayed(data))
+      .catch((error) => {
+        console.error("Error fetching games played:", error);
+        setErrorMsg("Error fetching games played");
+      })
+      .finally(() => setLoading(false));
+  };
+
   // When selectedDate changes, re-fetch the roster
   useEffect(() => {
     if (selectedDate) {
       fetchRoster(selectedDate);
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    fetchGamesPlayed(); // Fetch games played on mount
+  }, []);
 
   // Lock editing if any player record for the selected date has roster_picked true.
   const rosterLocked = roster.some(player => player.roster_picked === true);
@@ -343,8 +365,12 @@ function PlayerDashboardRoster() {
           <div className="moves-card card">
             <h4>Suggested Moves:</h4>
             <ul>
-              <li>1. "Start Andrew Wiggins over Klay Thompson once cleared."</li>
-              <li>2. "Bench Anthony Davis if knee soreness worsens."</li>
+              {gamesPlayed.map((game) => (
+                <li key={game.player_id + game.game_date_played}>
+                  {game.player_name} played on {game.game_date_played} - Roster
+                  Picked: {game.roster_picked ? "Yes" : "No"}
+                </li>
+              ))}
             </ul>
           </div>
         </div>
