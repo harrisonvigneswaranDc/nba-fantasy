@@ -148,9 +148,31 @@ app.post("/roster/category", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
+
   try {
     const { playerId, newCategory, gameDate } = req.body;
     const userId = req.user.user_id;
+
+    // Get the user's team
+    const teamResult = await pool.query(
+      "SELECT team_id FROM teams WHERE user_id = $1",
+      [userId]
+    );
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    const teamId = teamResult.rows[0].team_id;
+
+    // 🔒 Check if gameDate is locked
+    const lockedCheck = await pool.query(
+      "SELECT 1 FROM locked_schedule WHERE team_id = $1 AND locked_date = $2 LIMIT 1",
+      [teamId, gameDate]
+    );
+    if (lockedCheck.rows.length > 0) {
+      return res.status(403).json({
+        error: `Roster is locked for ${gameDate} and cannot be changed.`,
+      });
+    }
 
     // Check if the game has already been played
     const gameResult = await pool.query(
@@ -161,33 +183,23 @@ app.post("/roster/category", async (req, res) => {
       return res.status(400).json({ error: "Cannot change roster for past games." });
     }
 
-    // Get the user's team and the corresponding roster_id for the given player
-    const teamResult = await pool.query(
-      "SELECT team_id FROM teams WHERE user_id = $1",
-      [userId]
+    // Verify the player exists on the user's roster
+    const rosterResult = await pool.query(
+      "SELECT * FROM rosters WHERE team_id = $1 AND player_id = $2",
+      [teamId, playerId]
     );
-    if (teamResult.rows.length === 0) {
-      return res.status(404).json({ error: "Team not found for this user" });
+    if (rosterResult.rows.length === 0) {
+      return res.status(404).json({ error: "Player not found on your roster" });
     }
-    const teamId = teamResult.rows[0].team_id;
 
-    // Optionally verify the player exists on the roster.
-const rosterResult = await pool.query(
-  "SELECT * FROM rosters WHERE team_id = $1 AND player_id = $2",
-  [teamId, playerId]
-);
-if (rosterResult.rows.length === 0) {
-  return res.status(404).json({ error: "Player not found on your roster" });
-}
-
-await pool.query(
-  `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
-   VALUES ($1, $2, $3, $4)
-   ON CONFLICT (team_id, player_id, schedule_date)
-   DO UPDATE SET category = EXCLUDED.category`,
-  [teamId, playerId, gameDate, newCategory]
-);
-
+    // ✅ Upsert into roster_schedule
+    await pool.query(
+      `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (team_id, player_id, schedule_date)
+       DO UPDATE SET category = EXCLUDED.category`,
+      [teamId, playerId, gameDate, newCategory]
+    );
 
     res.json({ success: true, message: "Category updated successfully." });
   } catch (err) {
@@ -195,6 +207,7 @@ await pool.query(
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 
 // DELETE /roster endpoint to remove a player from the roster
@@ -377,7 +390,7 @@ app.get("/matchup-season", async (req, res) => {
 
     // Find an active (or upcoming) matchup for the user's league that includes their team.
     const matchupQuery = `
-      SELECT 
+      SELECT
         m.matchup_id,
         m.team_a_id,
         m.team_b_id,
@@ -388,9 +401,9 @@ app.get("/matchup-season", async (req, res) => {
       FROM matchups m
       JOIN teams ta ON m.team_a_id = ta.team_id
       JOIN teams tb ON m.team_b_id = tb.team_id
-      WHERE m.league_id = $1 
+      WHERE m.league_id = $1
         AND (m.team_a_id = $2 OR m.team_b_id = $2)
-      ORDER BY 
+      ORDER BY
         CASE WHEN CURRENT_DATE BETWEEN m.start_date AND m.end_date THEN 0 ELSE 1 END,
         m.start_date ASC
       LIMIT 1;
@@ -405,49 +418,64 @@ app.get("/matchup-season", async (req, res) => {
     // Then, combine the game stats from player_games_played.
     const statsQuery = `
       WITH date_series AS (
-        SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
-      ),
-      game_stats AS (
-        SELECT 
-          player_id,
-          game_date_played AS game_date,
-          pts,
-          reb,
-          ast,
-          stl,
-          blk,
-          NULL AS opp_time,
-          'played' AS source,
-          roster_picked
-        FROM player_games_played
-      )
-      SELECT
-        ds.game_date,
-        r.team_id,
-        r.player_id,
-        p.player AS player_name,
-        p.pos,
-        gs.pts,
-        gs.reb,
-        gs.ast,
-        gs.stl,
-        gs.blk,
-        gs.opp_time,
-        COALESCE(rs.category, r.category) AS category,
-        gs.source,
-        gs.roster_picked
-      FROM date_series ds
-      CROSS JOIN rosters r
-      JOIN players p ON r.player_id = p.player_id
-      LEFT JOIN game_stats gs
-        ON gs.player_id = r.player_id
-        AND gs.game_date = ds.game_date
-      LEFT JOIN roster_schedule rs
-        ON r.team_id = rs.team_id
-        AND r.player_id = rs.player_id
-        AND rs.schedule_date = ds.game_date
-      WHERE r.team_id IN ($3, $4)
-      ORDER BY r.team_id, ds.game_date, p.player ASC;
+  SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
+),
+game_stats AS (
+  SELECT 
+    player_id,
+    game_date_played AS game_date,
+    pts,
+    reb,
+    ast,
+    stl,
+    blk,
+    NULL AS opp_time,
+    'played' AS source
+  FROM player_games_played
+),
+roster_combined AS (
+  SELECT
+    r.team_id,
+    r.player_id,
+    ds.game_date,
+    COALESCE(ls.category, rs.category, r.category) AS category,
+    CASE
+      WHEN ls.locked_date IS NOT NULL THEN true
+      ELSE false
+    END AS is_locked
+  FROM rosters r
+  CROSS JOIN date_series ds
+  LEFT JOIN locked_schedule ls
+    ON r.team_id = ls.team_id
+   AND r.player_id = ls.player_id
+   AND ls.locked_date = ds.game_date
+  LEFT JOIN roster_schedule rs
+    ON r.team_id = rs.team_id
+   AND r.player_id = rs.player_id
+   AND rs.schedule_date = ds.game_date
+)
+
+SELECT
+  rc.game_date,
+  rc.team_id,
+  rc.player_id,
+  p.player AS player_name,
+  p.pos,
+  p.pos,
+  gs.pts,
+  gs.reb,
+  gs.ast,
+  gs.stl,
+  gs.blk,
+  gs.opp_time,
+  rc.category,
+  CASE WHEN gs.player_id IS NOT NULL THEN true ELSE false END AS game_played,
+  rc.is_locked
+FROM roster_combined rc
+JOIN players p ON rc.player_id = p.player_id
+LEFT JOIN game_stats gs ON gs.player_id = rc.player_id AND gs.game_date = rc.game_date
+WHERE rc.team_id IN ($3, $4)
+ORDER BY rc.team_id, rc.game_date, p.player ASC;
     `;
     const statsResult = await pool.query(statsQuery, [
       matchup.start_date,
@@ -506,39 +534,45 @@ app.get("/league-info", async (req, res) => {
 
 
 // GET /games-played endpoint to fetch games played
+// GET /games-played endpoint to fetch games played
 app.get("/games-played", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
-  try {
-    const userId = req.user.user_id;
-    const teamResult = await pool.query(
-      "SELECT team_id FROM teams WHERE user_id = $1",
-      [userId]
-    );
-    if (teamResult.rows.length === 0) {
-      return res.status(404).json({ error: "Team not found for this user" });
-    }
-    const teamId = teamResult.rows[0].team_id;
 
-    const { gameDate } = req.query; //date that the player can be moved
+  try {
+    const { gameDate, teamId } = req.query;
+
+    if (!teamId || !gameDate) {
+      return res.status(400).json({ error: "Missing teamId or gameDate" });
+    }
+
     const gamesPlayedResult = await pool.query(
-      `SELECT 
-            p.player AS player_name,
-            p.pos,
-            p.salary,
-            pgp.game_date_played,
-            pgp.roster_picked
-         FROM player_games_played pgp
-         JOIN players p ON pgp.player_id = p.player_id
-         JOIN rosters r ON pgp.player_id = r.player_id AND r.team_id = $1
-         WHERE r.team_id = $1
-         ORDER BY pgp.game_date_played DESC;`,
-      [teamId]
+      `
+      SELECT 
+        pgp.player_id,
+        p.player AS player_name,
+        p.pos,
+        p.salary,
+        pgp.game_date_played,
+        pgp.roster_picked,
+        pgp.pts,
+        pgp.reb,
+        pgp.ast,
+        pgp.stl,
+        pgp.blk
+      FROM player_games_played pgp
+      JOIN players p ON pgp.player_id = p.player_id
+      JOIN rosters r ON pgp.player_id = r.player_id AND r.team_id = $1
+      WHERE pgp.game_date_played = $2
+      ORDER BY pgp.game_date_played DESC;
+      `,
+      [teamId, gameDate]
     );
+
     res.json(gamesPlayedResult.rows);
   } catch (err) {
-    console.error(err.message);
+    console.error("Error fetching games played:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -578,13 +612,16 @@ app.get("/roster", async (req, res) => {
     return res.status(401).json({ error: "Not authenticated." });
   }
   try {
-    const { gameDate } = req.query;
+    const { gameDate, teamId } = req.query; // Now expecting teamId
     const userId = req.user.user_id;
     const teamResult = await pool.query("SELECT team_id FROM teams WHERE user_id = $1", [userId]);
     if (teamResult.rows.length === 0) {
       return res.status(404).json({ error: "Team not found for this user" });
     }
-    const teamId = teamResult.rows[0].team_id;
+    const originalTeamId = teamResult.rows[0].team_id;
+
+//if teamID is not in the query select the current user id
+    const currentTeamID = teamId || originalTeamId
 
     // Check if the gameDate is locked.
     const lockedCheck = await pool.query(
@@ -600,7 +637,7 @@ app.get("/roster", async (req, res) => {
          JOIN players p ON ls.player_id = p.player_id
          WHERE ls.locked_date = $1 AND ls.team_id = $2
          ORDER BY p.player ASC;`,
-        [gameDate, teamId]
+        [gameDate, currentTeamID]
       );
       return res.json(lockedRoster.rows);
     } else {
@@ -621,7 +658,7 @@ app.get("/roster", async (req, res) => {
            AND rs.schedule_date = $1
          WHERE r.team_id = $2
          ORDER BY p.player ASC;`,
-        [gameDate, teamId]
+        [gameDate, currentTeamID]
       );
       return res.json(rosterResult.rows);
     }

@@ -8,51 +8,102 @@ function PlayerDashboardMatchup() {
   const [selectedDate, setSelectedDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rosterA, setRosterA] = useState([]);
+  const [rosterB, setRosterB] = useState([]);
+  const [gamesPlayedTeamA, setGamesPlayedTeamA] = useState([]);
+  const [gamesPlayedTeamB, setGamesPlayedTeamB] = useState([]);
 
   // First, fetch league info to get season start and end dates.
   useEffect(() => {
-    fetch("http://localhost:3001/league-info", { credentials: "include" })
-      .then((res) => {
+    const fetchLeagueInfo = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/league-info", { credentials: "include" });
         if (!res.ok) {
           throw new Error("Network response not ok");
         }
-        return res.json();
-      })
-      .then((leagueInfo) => {
+        const leagueInfo = await res.json();
         setSeasonRange({
           season_start: new Date(leagueInfo.season_start).toISOString().slice(0, 10),
           season_end: new Date(leagueInfo.season_end).toISOString().slice(0, 10),
           league_name: leagueInfo.league_name,
         });
-        // Set default selected date to the season start date.
         setSelectedDate(new Date(leagueInfo.season_start).toISOString().slice(0, 10));
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Error fetching league info:", err);
         setError("Error fetching league info");
-      });
+      }
+    };
+    fetchLeagueInfo();
   }, []);
 
-  // Then, fetch matchup-season data.
+  // Function to fetch roster data
+  const fetchRoster = async (date, teamId, setter) => {
+    try {
+      setLoading(true);
+      const url = `http://localhost:3001/roster?gameDate=${date}&teamId=${teamId}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch roster for team ${teamId} on ${date}`);
+      }
+      const data = await response.json();
+      setter(data);
+    } catch (error) {
+      console.error(`Error fetching roster for team ${teamId}:`, error);
+      setError(`Error fetching roster for team ${teamId}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to fetch games played data
+  const fetchGamesPlayed = async (date, teamId, setter) => {
+    try {
+      setLoading(true);
+      const url = `http://localhost:3001/games-played?gameDate=${date}&teamId=${teamId}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch games played for team ${teamId} on ${date}`);
+      }
+      const data = await response.json();
+      setter(data);
+    } catch (error) {
+      console.error(`Error fetching games played for team ${teamId}:`, error);
+      setError("Error fetching games played");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch matchup-season data, rosters, and games played
   useEffect(() => {
-    if (selectedDate) {
-      const fetchUrl = "http://localhost:3001/matchup-season";
-      fetch(fetchUrl, { credentials: "include" })
-        .then((res) => {
+    const fetchData = async () => {
+      if (selectedDate) {
+        try {
+          setLoading(true);
+          const res = await fetch("http://localhost:3001/matchup-season", { credentials: "include" });
           if (!res.ok) {
             throw new Error("Network response was not ok");
           }
-          return res.json();
-        })
-        .then((jsonData) => {
+          const jsonData = await res.json();
           setData(jsonData);
-        })
-        .catch((err) => {
+
+          if (jsonData.matchup) {
+            await Promise.all([
+              fetchRoster(selectedDate, jsonData.matchup.team_a_id, setRosterA),
+              fetchRoster(selectedDate, jsonData.matchup.team_b_id, setRosterB),
+              fetchGamesPlayed(selectedDate, jsonData.matchup.team_a_id, setGamesPlayedTeamA),
+              fetchGamesPlayed(selectedDate, jsonData.matchup.team_b_id, setGamesPlayedTeamB),
+            ]);
+          }
+        } catch (err) {
           console.error("Error fetching matchup data:", err);
           setError("Error fetching matchup data");
-        })
-        .finally(() => setLoading(false));
-    }
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchData();
   }, [selectedDate]);
 
   if (loading) return <div>Loading matchup data...</div>;
@@ -60,34 +111,29 @@ function PlayerDashboardMatchup() {
   if (!data) return <div>No matchup data available.</div>;
   if (!selectedDate) return <div>No date selected.</div>;
 
-  const { matchup, stats } = data;
+  const { matchup } = data;
 
-  // Filter stats to include only rows for the selected date.
-  const filteredStats = stats.filter((row) => {
-    const rowDate = new Date(row.game_date).toISOString().slice(0, 10);
-    return rowDate === selectedDate;
-  });
+  // Helper function to categorize players
+  const categorizePlayers = (roster) => {
+    const starters = roster.filter((player) => player.category === "starter");
+    const bench = roster.filter((player) => player.category === "bench");
+    const reserve = roster.filter((player) => player.category === "reserve");
+    return { starters, bench, reserve };
+  };
 
-  // Separate stats into team A and team B.
-  const teamAStats = filteredStats.filter((row) => row.team_id === matchup.team_a_id);
-  const teamBStats = filteredStats.filter((row) => row.team_id === matchup.team_b_id);
+  // Categorize players for each team
+  const teamACategories = categorizePlayers(rosterA);
+  const teamBCategories = categorizePlayers(rosterB);
 
-  // Group players by their roster category.
-  const getCategory = (player) => player.category || "starter"; // default to "starter" if missing
-  const teamAStarters = teamAStats.filter((player) => getCategory(player) === "starter");
-  const teamABench = teamAStats.filter((player) => getCategory(player) === "bench");
-  const teamADNP = teamAStats.filter((player) => getCategory(player) === "reserve");
-
-  const teamBStarters = teamBStats.filter((player) => getCategory(player) === "starter");
-  const teamBBench = teamBStats.filter((player) => getCategory(player) === "bench");
-  const teamBDNP = teamBStats.filter((player) => getCategory(player) === "reserve");
-
-  // Helper function to render rows for a given category.
-  function renderCategoryRows(categoryLabel, teamAPlayers, teamBPlayers) {
+  // Helper function to render rows for a given category
+  function renderCategoryRows(categoryLabel, teamAPlayers, teamBPlayers, gamesPlayedTeamA, gamesPlayedTeamB) {
     const maxLength = Math.max(teamAPlayers.length, teamBPlayers.length);
     const rows = [];
 
-    // Section header row.
+    console.log("Team A Game Stats:", gamesPlayedTeamA);
+    console.log("Team B Game Stats:", gamesPlayedTeamB);
+
+    // Section header row
     rows.push(
       <tr className="section-label" key={`${categoryLabel}-header`}>
         <td colSpan="12">{categoryLabel.toUpperCase()}</td>
@@ -99,6 +145,11 @@ function PlayerDashboardMatchup() {
     for (let i = 0; i < maxLength; i++) {
       const playerA = teamAPlayers[i];
       const playerB = teamBPlayers[i];
+
+      // Find game stats for the player by player_id
+      const playerAGameStats = gamesPlayedTeamA.find(game => game.player_id === playerA?.player_id);
+      const playerBGameStats = gamesPlayedTeamB.find(game => game.player_id === playerB?.player_id);
+
       rows.push(
         <tr key={`${categoryLabel}-row-${i}`}>
           {/* Team A data */}
@@ -110,12 +161,11 @@ function PlayerDashboardMatchup() {
               <td>{playerA.injury || "-"}</td>
               <td>{playerA.curr_pts || "-"}</td>
               <td>{playerA.tot_fan_pts || "-"}</td>
-              <td>{playerA.pts || "-"}</td>
-              <td>{playerA.reb || "-"}</td>
-              <td>{playerA.ast || "-"}</td>
-              <td>{playerA.stl || "-"}</td>
-              <td>{playerA.blk || "-"}</td>
-              <td>{playerA.tov || "-"}</td>
+              <td>{playerAGameStats ? playerAGameStats.pts : "-"}</td>
+              <td>{playerAGameStats ? playerAGameStats.reb : "-"}</td>
+              <td>{playerAGameStats ? playerAGameStats.ast : "-"}</td>
+              <td>{playerAGameStats ? playerAGameStats.stl : "-"}</td>
+              <td>{playerAGameStats ? playerAGameStats.blk : "-"}</td>
             </>
           ) : (
             <td colSpan="12"></td>
@@ -130,12 +180,11 @@ function PlayerDashboardMatchup() {
               <td>{playerB.injury || "-"}</td>
               <td>{playerB.curr_pts || "-"}</td>
               <td>{playerB.tot_fan_pts || "-"}</td>
-              <td>{playerB.pts || "-"}</td>
-              <td>{playerB.reb || "-"}</td>
-              <td>{playerB.ast || "-"}</td>
-              <td>{playerB.stl || "-"}</td>
-              <td>{playerB.blk || "-"}</td>
-              <td>{playerB.tov || "-"}</td>
+              <td>{playerBGameStats ? playerBGameStats.pts : "-"}</td>
+              <td>{playerBGameStats ? playerBGameStats.reb : "-"}</td>
+              <td>{playerBGameStats ? playerBGameStats.ast : "-"}</td>
+              <td>{playerBGameStats ? playerBGameStats.stl : "-"}</td>
+              <td>{playerBGameStats ? playerBGameStats.blk : "-"}</td>
             </>
           ) : (
             <td colSpan="12"></td>
@@ -146,7 +195,7 @@ function PlayerDashboardMatchup() {
     return rows;
   }
 
-  // Date navigation handlers. Limit navigation within the season date range.
+  // Date navigation handlers
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() - 1);
@@ -170,7 +219,7 @@ function PlayerDashboardMatchup() {
       <Header />
       <div className="league-info">
         <p>
-          Season: {seasonRange.season_start} to {seasonRange.season_end}{" "}
+          Season: {seasonRange.season_start} to {seasonRange.season_end}
           <br />
           League: {seasonRange.league_name}
         </p>
@@ -200,11 +249,11 @@ function PlayerDashboardMatchup() {
       {/* Date Navigation */}
       <div className="date-nav">
         <button onClick={handlePrevDay} disabled={selectedDate === seasonRange.season_start}>
-          &lt;- Prev Day
+          Prev Day
         </button>
         <span>{selectedDate}</span>
         <button onClick={handleNextDay} disabled={selectedDate === seasonRange.season_end}>
-          Next Day -&gt;
+          Next Day
         </button>
       </div>
 
@@ -225,7 +274,6 @@ function PlayerDashboardMatchup() {
               <th>AST</th>
               <th>ST</th>
               <th>BLK</th>
-              <th>TO</th>
               {/* Middle Divider */}
               <th className="middle-col">|</th>
               {/* Right Team Columns */}
@@ -240,13 +288,12 @@ function PlayerDashboardMatchup() {
               <th>AST</th>
               <th>ST</th>
               <th>BLK</th>
-              <th>TO</th>
             </tr>
           </thead>
           <tbody>
-            {renderCategoryRows("Starters", teamAStarters, teamBStarters)}
-            {renderCategoryRows("Bench", teamABench, teamBBench)}
-            {renderCategoryRows("DNP", teamADNP, teamBDNP)}
+            {renderCategoryRows("Starters", teamACategories.starters, teamBCategories.starters, gamesPlayedTeamA, gamesPlayedTeamB)}
+            {renderCategoryRows("Bench", teamACategories.bench, teamBCategories.bench, gamesPlayedTeamA, gamesPlayedTeamB)}
+            {renderCategoryRows("DNP", teamACategories.reserve, teamBCategories.reserve, gamesPlayedTeamA, gamesPlayedTeamB)}
           </tbody>
         </table>
       </div>
