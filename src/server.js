@@ -390,23 +390,27 @@ app.get("/matchup-season", async (req, res) => {
 
     // Find an active (or upcoming) matchup for the user's league that includes their team.
     const matchupQuery = `
-      SELECT
-        m.matchup_id,
-        m.team_a_id,
-        m.team_b_id,
-        m.start_date,
-        m.end_date,
-        ta.team_name AS teamA_name,
-        tb.team_name AS teamB_name
-      FROM matchups m
-      JOIN teams ta ON m.team_a_id = ta.team_id
-      JOIN teams tb ON m.team_b_id = tb.team_id
-      WHERE m.league_id = $1
-        AND (m.team_a_id = $2 OR m.team_b_id = $2)
-      ORDER BY
-        CASE WHEN CURRENT_DATE BETWEEN m.start_date AND m.end_date THEN 0 ELSE 1 END,
-        m.start_date ASC
-      LIMIT 1;
+     SELECT
+  m.matchup_id,
+  m.team_a_id,
+  m.team_b_id,
+  m.start_date,
+  m.end_date,
+  m.team_a_score,
+  m.team_b_score,
+  ta.team_name AS teamA_name,
+  tb.team_name AS teamB_name
+FROM matchups m
+JOIN teams ta ON m.team_a_id = ta.team_id
+JOIN teams tb ON m.team_b_id = tb.team_id
+WHERE m.league_id = $1
+  AND (m.team_a_id = $2 OR m.team_b_id = $2)
+ORDER BY 
+  CASE WHEN CURRENT_DATE BETWEEN m.start_date AND m.end_date THEN 0 ELSE 1 END,
+  m.start_date ASC
+LIMIT 1;
+
+
     `;
     const matchupResult = await pool.query(matchupQuery, [league_id, team_id]);
     if (matchupResult.rows.length === 0) {
@@ -763,6 +767,14 @@ app.post("/reset-draft", async (req, res) => {
       WHERE league_id = $1
     `, [leagueId]);
 
+    // 4) Reset team salary
+    await pool.query(`
+      UPDATE matchups
+  SET team_a_score = 0,
+      team_b_score = 0
+  WHERE league_id = $1
+    `, [leagueId]);
+
     await pool.query("COMMIT");
     res.json({ success: true, message: "Draft reset successfully." });
   } catch (error) {
@@ -884,6 +896,34 @@ app.get("/league-players", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// Endpoint: Update the matchup scores
+app.post("/update-matchup-score", async (req, res) => {
+  const { matchupId, overallTeamAScore, overallTeamBScore } = req.body;
+  if (!matchupId || overallTeamAScore === undefined || overallTeamBScore === undefined) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  try {
+    await pool.query(
+      `UPDATE matchups
+       SET team_a_score = $1,
+           team_b_score = $2
+       WHERE matchup_id = $3`,
+      [overallTeamAScore, overallTeamBScore, matchupId]
+    );
+    res.json({
+      success: true,
+      team_a_score: overallTeamAScore,
+      team_b_score: overallTeamBScore,
+    });
+  } catch (err) {
+    console.error("Error updating matchup score:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
