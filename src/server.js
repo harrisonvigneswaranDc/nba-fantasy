@@ -208,34 +208,78 @@ app.post("/roster/category", async (req, res) => {
   }
 });
 
-
-
-// DELETE /roster endpoint to remove a player from the roster
-app.delete("/roster", async (req, res) => {
+// POST /roster/remove endpoint: Remove a player, update player_picked, and subtract player's salary from team's salary.
+app.post("/roster/remove", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
+  const { playerId, gameDate } = req.body;
+  if (!playerId) {
+    return res.status(400).json({ error: "Missing playerId." });
+  }
   try {
-    const { playerId } = req.body;
     const userId = req.user.user_id;
+    // Retrieve the user's team (and league) info.
     const teamResult = await pool.query(
-      "SELECT team_id FROM teams WHERE user_id = $1",
+      "SELECT team_id, league_id FROM teams WHERE user_id = $1",
       [userId]
     );
     if (teamResult.rows.length === 0) {
       return res.status(404).json({ error: "Team not found for this user" });
     }
-    const teamId = teamResult.rows[0].team_id;
+    const { team_id, league_id } = teamResult.rows[0];
+
+    // Begin transaction.
+    await pool.query("BEGIN");
+
+    // Fetch the player's salary.
+    const playerResult = await pool.query(
+      "SELECT salary FROM players WHERE player_id = $1 AND league_id = $2",
+      [playerId, league_id]
+    );
+    if (playerResult.rows.length === 0) {
+      await pool.query("ROLLBACK");
+      return res.status(404).json({ error: "Player not found in league" });
+    }
+    const playerSalary = Number(playerResult.rows[0].salary);
+
+    // Update the player's record to mark them as not picked.
+    await pool.query(
+      "UPDATE players SET player_picked = false WHERE player_id = $1",
+      [playerId]
+    );
+
+    // Subtract the player's salary from the team's salary.
+    await pool.query(
+      "UPDATE teams SET team_salary = team_salary - $1 WHERE team_id = $2",
+      [playerSalary, team_id]
+    );
+
+    // Remove the player from the active roster.
     await pool.query(
       "DELETE FROM rosters WHERE team_id = $1 AND player_id = $2",
-      [teamId, playerId]
+      [team_id, playerId]
     );
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Error removing player:", err);
+
+    // Optionally remove from the roster_schedule for the specific game date, if provided.
+    if (gameDate) {
+      await pool.query(
+        "DELETE FROM roster_schedule WHERE team_id = $1 AND player_id = $2 AND schedule_date = $3",
+        [team_id, playerId, gameDate]
+      );
+    }
+
+    await pool.query("COMMIT");
+    res.json({ success: true, message: "Player removed successfully." });
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    console.error("Error removing player:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
+
 
 // POST /roster/save endpoint to update the lineup for a given game date.
 // It only updates if there is no played record (with roster_picked true) for that date.

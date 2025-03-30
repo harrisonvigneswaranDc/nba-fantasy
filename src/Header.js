@@ -59,7 +59,6 @@ const Header = () => {
         {user ? (
           <>
             <Link className="nav-link" to="/player-dashboard">Player Dashboard</Link>
-            <Link className="nav-link" to="/profile">Profile</Link>
             <button className="nav-button" onClick={handleLogout}>Logout</button>
           </>
         ) : (

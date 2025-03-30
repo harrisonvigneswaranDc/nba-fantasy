@@ -205,23 +205,21 @@ function PlayerDashboardMatchup() {
       let overallTeamBScore;
       const prevDateStr = prevSelectedDateRef.current;
 
-      if (prevDateStr && new Date(selectedDate) < new Date(prevDateStr)) {
-        // Navigating backward: subtract daily scores
-        overallTeamAScore = storedTeamAScore - dailyScoreTeamA;
-        overallTeamBScore = storedTeamBScore - dailyScoreTeamB;
-        // Reset the flag when navigating backward so future forward moves can add scores
-        hasAddedDailyScoreRef.current = false;
+      if (!hasAddedDailyScoreRef.current) {
+        overallTeamAScore = storedTeamAScore + dailyScoreTeamA;
+        overallTeamBScore = storedTeamBScore + dailyScoreTeamB;
+        hasAddedDailyScoreRef.current = true;
+        
+        // Check if overallTeamAScore is double the stored score.
+        if (overallTeamAScore === storedTeamAScore * 2) {
+          overallTeamAScore = overallTeamAScore - dailyScoreTeamA;
+          overallTeamBScore = overallTeamBScore - dailyScoreTeamB;
+          console.log("Detected double addition; subtracted dailyScoreTeamA");
+        } 
       } else {
-        // Navigating forward (or no previous date): add daily scores only once
-        if (!hasAddedDailyScoreRef.current) {
-          overallTeamAScore = storedTeamAScore + dailyScoreTeamA;
-          overallTeamBScore = storedTeamBScore + dailyScoreTeamB;
-          hasAddedDailyScoreRef.current = true;
-        } else {
-          overallTeamAScore = storedTeamAScore;
-          overallTeamBScore = storedTeamBScore;
-          console.log("Daily score already added.");
-        }
+        overallTeamAScore = storedTeamAScore;
+        overallTeamBScore = storedTeamBScore;
+        console.log("Daily score already added.");
       }
 
       console.log("Updating score for", selectedDate);

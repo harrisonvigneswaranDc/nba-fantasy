@@ -137,3 +137,57 @@
     text-decoration: underline;
   }
   
+/* Matchup Card Styles */
+.matchup-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 1rem;
+}
+
+.matchup-card .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.matchup-card .header span:last-child {
+  cursor: pointer;
+}
+
+/* Container for both team cards and vs text */
+.matchup-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Each team container */
+.team-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+/* Team information styling */
+.team-info {
+  text-align: center;
+}
+
+/* Score styling */
+.team-score {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+/* "vs" separator styling */
+.vs {
+  padding: 0 10px;
+  font-weight: bold;
+}

@@ -21,22 +21,37 @@ function HomePage() {
         </section>
 
         {/* Quick Preview / Public Info */}
-        <section className="preview-section card">
-          <h2>Quick Preview / Public Info:</h2>
-          <ul>
-            <li>“See a sample matchup” [Optional link]</li>
-            <li>“Check out top fantasy rosters” [Optional link]</li>
-          </ul>
-        </section>
+        <div class="matchup-card">
+  <div class="header">
+    <span>Pracice Fantasy matchup</span>
+    <span>&raquo;</span>
+  </div>
+  
+  <div class="matchup-content">
+    <div class="team-card">
+      <div class="team-info">
+        <div>Battery Brains</div>
+        <div>(3-8-0 | 12th)</div>
+      </div>
+      <div class="team-score">569.50</div>
+    </div>
+    
+    <div class="vs">vs</div>
+    
+    <div class="team-card">
+      <div class="team-info">
+        <div>Raptors Revenge</div>
+        <div>(10-1-0 | 1st)</div>
+      </div>
+      <div class="team-score">904.30</div>
+    </div>
+  </div>
+</div>
+
 
         {/* Join / Create League */}
         <section className="league-actions-section card">
           <div className="actions-row">
-            <div className="action-box">
-              <button className="join-league-btn">Join a League</button>
-              <p>"Play in a friend league"</p>
-              <input type="text" placeholder="[ Enter Code ]" className="enter-code-input" />
-            </div>
             <div className="action-box">
               <Link to="./live-draft-page">
               <button className="create-league-btn">Create a League</button>

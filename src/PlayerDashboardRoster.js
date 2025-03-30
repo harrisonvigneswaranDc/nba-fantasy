@@ -3,8 +3,9 @@ import "./PlayerDashboardRoster.css";
 import Header from "./Header";
 
 function PlayerDashboardRoster() {
+  // STATES
   const [roster, setRoster] = useState([]);
-  const [gamesPlayed, setGamesPlayed] = useState([]); // NEW STATE
+  const [gamesPlayed, setGamesPlayed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
@@ -14,7 +15,48 @@ function PlayerDashboardRoster() {
     league_name: ""
   });
 
-  // Fetch league info (season dates and league name)
+  // SALARY CAP SETTINGS
+  const SALARY_CAP_RULES = {
+    softCap: 140000000,
+    firstApron: 178000000,
+    hardCap: 189000000,
+    totalBudget: 300000000
+  };
+
+  // CALCULATE PAYROLL AND TAXES
+  const payroll = roster.reduce((sum, p) => sum + Number(p.salary || 0), 0);
+  const tier1Excess =
+    payroll > SALARY_CAP_RULES.softCap
+      ? Math.min(payroll - SALARY_CAP_RULES.softCap, 31000000)
+      : 0;
+  const tier1Tax = tier1Excess * 1.5;
+  const tier2Excess =
+    payroll > SALARY_CAP_RULES.firstApron
+      ? Math.min(payroll - SALARY_CAP_RULES.firstApron, 11000000)
+      : 0;
+  const tier2Tax = tier2Excess * 2;
+  const tier3Excess =
+    payroll > SALARY_CAP_RULES.hardCap ? payroll - SALARY_CAP_RULES.hardCap : 0;
+  const tier3Tax = tier3Excess * 3;
+  const totalTax = tier1Tax + tier2Tax + tier3Tax;
+
+  const capStage =
+    payroll <= SALARY_CAP_RULES.softCap
+      ? "Below Soft Cap"
+      : payroll <= SALARY_CAP_RULES.firstApron
+      ? "Soft Cap"
+      : payroll <= SALARY_CAP_RULES.hardCap
+      ? "First Apron"
+      : "Second Apron (Hard Cap)";
+
+  const getCapColor = (payroll) => {
+    if (payroll <= SALARY_CAP_RULES.softCap) return "#4caf50";
+    if (payroll <= SALARY_CAP_RULES.firstApron) return "#ffc107";
+    if (payroll <= SALARY_CAP_RULES.hardCap) return "#ff9800";
+    return "#f44336";
+  };
+
+  // FETCH LEAGUE INFO
   useEffect(() => {
     fetch("http://localhost:3001/league-info", { credentials: "include" })
       .then((res) => {
@@ -33,7 +75,6 @@ function PlayerDashboardRoster() {
           season_end: seasonEnd,
           league_name: leagueInfo.league_name,
         });
-        // Default to season start or adjust as needed
         setSelectedDate(seasonStart);
       })
       .catch((err) => {
@@ -42,16 +83,13 @@ function PlayerDashboardRoster() {
       });
   }, []);
 
-  // Fetch roster for a given date
+  // FETCH ROSTER FOR SELECTED DATE
   const fetchRoster = (date) => {
     setLoading(true);
-    const url = `http://localhost:3001/roster?gameDate=${date}`;
-    fetch(url, { credentials: "include" })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        return response.json();
+    fetch(`http://localhost:3001/roster?gameDate=${date}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch roster");
+        return res.json();
       })
       .then((data) => setRoster(data))
       .catch((error) => {
@@ -61,14 +99,13 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
+  // FETCH GAMES PLAYED
   const fetchGamesPlayed = () => {
     setLoading(true);
-    fetch("http://localhost:3001/games-played", { credentials: "include" }) // No gameDate needed here
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        return response.json();
+    fetch("http://localhost:3001/games-played", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch games played");
+        return res.json();
       })
       .then((data) => setGamesPlayed(data))
       .catch((error) => {
@@ -78,29 +115,34 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
-  // When selectedDate changes, re-fetch the roster
+  // Re-fetch roster when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
       fetchRoster(selectedDate);
     }
   }, [selectedDate]);
 
+  // Fetch games played on mount
   useEffect(() => {
-    fetchGamesPlayed(); // Fetch games played on mount
+    fetchGamesPlayed();
   }, []);
 
-  // Lock editing if any player record for the selected date has roster_picked true.
-  const rosterLocked = roster.some(player => player.roster_picked === true);
+  // Determine if roster is locked by either any player having been picked or if a game has been played on the selected date.
+  const rosterLocked =
+    roster.some((player) => player.roster_picked === true) ||
+    gamesPlayed.some((game) => game.game_date === selectedDate);
 
-  // Filter roster by category
+  // Roster filters by category
   const starters = roster.filter((player) => player.category === "starter");
   const bench = roster.filter((player) => player.category === "bench");
   const reserve = roster.filter((player) => player.category === "reserve");
 
-  // Handler to update category (only allowed if not locked)
+  // Helper function: returns true if player action buttons should be shown
+  const showPlayerButtons = () => !rosterLocked;
+
+  // Handler for editing player category (only allowed if not locked)
   const handleChangeCategory = (playerId, newCategory) => {
     if (rosterLocked) return;
-
     fetch("http://localhost:3001/roster/category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,27 +159,27 @@ function PlayerDashboardRoster() {
       .catch((error) => console.error("Error updating category:", error));
   };
 
-  // Handler to remove player (only if not locked)
-  const handleRemovePlayer = (playerId) => {
-    if (rosterLocked) return;
-    setRoster((prevRoster) =>
-      prevRoster.filter((player) => player.player_id !== playerId)
-    );
-  };
-
-  // Save lineup handler
-  const handleSaveLineup = () => {
+  // Save lineup handler with validations.
+  // If no argument is provided, it uses the current roster state.
+  const handleSaveLineup = (rosterToSave = roster) => {
+    if (!Array.isArray(rosterToSave)) {
+      console.error("Expected rosterToSave to be an array:", rosterToSave);
+      return;
+    }
     setErrorMsg("");
+    const startersFiltered = rosterToSave.filter((player) => player.category === "starter");
+    const benchFiltered = rosterToSave.filter((player) => player.category === "bench");
+    const reserveFiltered = rosterToSave.filter((player) => player.category === "reserve");
 
-    if (starters.length !== 5) {
+    if (startersFiltered.length !== 5) {
       setErrorMsg("You must have exactly 5 starters.");
       return;
     }
-    if (bench.length !== 4) {
+    if (benchFiltered.length !== 4) {
       setErrorMsg("You must have exactly 4 bench players.");
       return;
     }
-    if (reserve.length !== 6) {
+    if (reserveFiltered.length > 6) {
       setErrorMsg("You must have exactly 6 reserve players.");
       return;
     }
@@ -146,7 +188,7 @@ function PlayerDashboardRoster() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ roster, gameDate: selectedDate }),
+      body: JSON.stringify({ roster: rosterToSave, gameDate: selectedDate }),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to save lineup");
@@ -158,11 +200,20 @@ function PlayerDashboardRoster() {
       })
       .catch((error) => {
         console.error("Error saving lineup:", error);
-        setErrorMsg("Error saving lineup. Please try again.");
+        setErrorMsg("Error saving lineup: " + error.message);
       });
   };
 
-  // Date navigation handlers (restricting to season range)
+  // Handler to remove a player.
+  // This version creates an updated roster array (without the removed player)
+  // and then calls handleSaveLineup with that updated array.
+  const handleRemovePlayer = (playerId) => {
+    if (rosterLocked) return;
+    const updatedRoster = roster.filter((player) => player.player_id !== playerId);
+    handleSaveLineup(updatedRoster);
+  };
+
+  // Date navigation handlers
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() - 1);
@@ -187,7 +238,7 @@ function PlayerDashboardRoster() {
     <div className="roster-page">
       <Header />
 
-      {/* League Info & Date Selection Section */}
+      {/* League Info & Date Selection */}
       <div className="date-section">
         <div className="league-info">
           <p>
@@ -195,15 +246,21 @@ function PlayerDashboardRoster() {
             League: {seasonRange.league_name}
           </p>
         </div>
-        <label htmlFor="game-date">Select Game Date: </label>
-        <input
-          type="date"
-          id="game-date"
-          value={selectedDate}
-          min={seasonRange.season_start}
-          max={seasonRange.season_end}
-          onChange={(e) => setSelectedDate(e.target.value)}
-        />
+        <div className="date-controls">
+          <button onClick={handlePrevDay} disabled={selectedDate === seasonRange.season_start}>
+            ◀
+          </button>
+          <input
+            type="date"
+            value={selectedDate}
+            min={seasonRange.season_start}
+            max={seasonRange.season_end}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+          <button onClick={handleNextDay} disabled={selectedDate === seasonRange.season_end}>
+            ▶
+          </button>
+        </div>
         {rosterLocked && (
           <span className="locked-message">
             Roster is locked for this game (finalized).
@@ -211,24 +268,44 @@ function PlayerDashboardRoster() {
         )}
       </div>
 
-      <div className="content-row">
-        {/* Left Column: Salary Cap Info + Roster */}
-        <div className="left-column">
-          <div className="salary-cap-card card">
-            <p>
-              <strong>Salary Cap:</strong>
-              <span className="progress-bar">($152M used / $165M)</span>
-            </p>
-            <ul>
-              <li>- You are currently $13M below the Hard Cap</li>
-              <li>- You have $2.5M remaining from your Mid-Level Exception</li>
-              <li>- Under the Luxury Tax Threshold by $3M</li>
-            </ul>
+      {/* Salary Cap Card */}
+      <div className="salary-cap-card card">
+        <p>
+          <strong>Salary Cap:</strong>
+          <span> (${payroll.toLocaleString()} / ${SALARY_CAP_RULES.totalBudget.toLocaleString()})</span>
+        </p>
+        <p><strong>Current Cap Stage:</strong> {capStage}</p>
+        <div className="salary-cap-bar">
+          <div
+            className="salary-cap-progress"
+            style={{
+              width: `${(payroll / SALARY_CAP_RULES.totalBudget) * 100}%`,
+              background: getCapColor(payroll),
+              height: "10px",
+              borderRadius: "5px"
+            }}
+          ></div>
+        </div>
+        <div className="tax-breakdown">
+          <div>
+            Tier 1: ${tier1Excess.toLocaleString()} taxed at 1.5× = ${tier1Tax.toLocaleString()}
           </div>
+          <div>
+            Tier 2: ${tier2Excess.toLocaleString()} taxed at 2× = ${tier2Tax.toLocaleString()}
+          </div>
+          <div>
+            Tier 3: ${tier3Excess.toLocaleString()} taxed at 3× = ${tier3Tax.toLocaleString()}
+          </div>
+          <div>
+            <strong>Total Tax Owed:</strong> ${totalTax.toLocaleString()}
+          </div>
+        </div>
+      </div>
 
-          {errorMsg && <div className="error-message">{errorMsg}</div>}
-
-          {/* Starters Section */}
+      {/* Roster Sections */}
+      <div className="content-row">
+        <div className="left-column">
+          {/* Starters */}
           <div className="roster-section card">
             <h3>Starters (Max 5)</h3>
             <ul>
@@ -237,28 +314,13 @@ function PlayerDashboardRoster() {
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
                       <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {player.salary}
+                      {Number(player.salary).toLocaleString()}
                     </div>
-                    {!rosterLocked && (
+                    {showPlayerButtons() && (
                       <div className="player-buttons">
-                        <button
-                          className="remove-player-btn"
-                          onClick={() => handleRemovePlayer(player.player_id)}
-                        >
-                          REMOVE
-                        </button>
-                        <button
-                          className="bench-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "bench")}
-                        >
-                          BENCH
-                        </button>
-                        <button
-                          className="dnp-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
-                        >
-                          DNP
-                        </button>
+                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "reserve")}>DNP</button>
                       </div>
                     )}
                   </li>
@@ -269,7 +331,7 @@ function PlayerDashboardRoster() {
             </ul>
           </div>
 
-          {/* Bench Section */}
+          {/* Bench */}
           <div className="roster-section card">
             <h3>Bench (Max 4)</h3>
             <ul>
@@ -278,28 +340,13 @@ function PlayerDashboardRoster() {
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
                       <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {player.salary}
+                      {Number(player.salary).toLocaleString()}
                     </div>
-                    {!rosterLocked && (
+                    {showPlayerButtons() && (
                       <div className="player-buttons">
-                        <button
-                          className="remove-player-btn"
-                          onClick={() => handleRemovePlayer(player.player_id)}
-                        >
-                          REMOVE
-                        </button>
-                        <button
-                          className="start-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "starter")}
-                        >
-                          START
-                        </button>
-                        <button
-                          className="dnp-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
-                        >
-                          DNP
-                        </button>
+                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "starter")}>START</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "reserve")}>DNP</button>
                       </div>
                     )}
                   </li>
@@ -310,7 +357,7 @@ function PlayerDashboardRoster() {
             </ul>
           </div>
 
-          {/* DNP / Reserve Section */}
+          {/* Reserve */}
           <div className="roster-section card">
             <h3>DNP / Reserve (Max 6)</h3>
             <ul>
@@ -319,28 +366,13 @@ function PlayerDashboardRoster() {
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
                       <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {player.salary}
+                      {Number(player.salary).toLocaleString()}
                     </div>
-                    {!rosterLocked && (
+                    {showPlayerButtons() && (
                       <div className="player-buttons">
-                        <button
-                          className="remove-player-btn"
-                          onClick={() => handleRemovePlayer(player.player_id)}
-                        >
-                          REMOVE
-                        </button>
-                        <button
-                          className="bench-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "bench")}
-                        >
-                          BENCH
-                        </button>
-                        <button
-                          className="start-btn"
-                          onClick={() => handleChangeCategory(player.player_id, "starter")}
-                        >
-                          START
-                        </button>
+                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
+                        <button onClick={() => handleChangeCategory(player.player_id, "starter")}>START</button>
                       </div>
                     )}
                   </li>
@@ -351,35 +383,12 @@ function PlayerDashboardRoster() {
             </ul>
           </div>
         </div>
-
-        {/* Right Column: Injury Status & Suggested Moves */}
-        <div className="right-column">
-          <div className="injury-status-card card">
-            <h4>Injury Status:</h4>
-            <ul>
-              <li>• Anthony Davis (PF) – Day-to-Day (knee soreness)</li>
-              <li>• Chris Paul (PG) – Probable (minor ankle sprain)</li>
-              <li>• Andrew Wiggins (SF) – Out (concussion protocol)</li>
-            </ul>
-          </div>
-          <div className="moves-card card">
-            <h4>Suggested Moves:</h4>
-            <ul>
-              {gamesPlayed.map((game) => (
-                <li key={game.player_id + game.game_date_played}>
-                  {game.player_name} played on {game.game_date_played} - Roster
-                  Picked: {game.roster_picked ? "Yes" : "No"}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
       </div>
 
-      {/* Footer Button: Save Lineup (only if not locked) */}
-      {!rosterLocked && (
+      {/* Save Lineup Button */}
+      {showPlayerButtons() && (
         <div className="lineup-buttons">
-          <button className="save-btn" onClick={handleSaveLineup}>
+          <button className="save-btn" onClick={() => handleSaveLineup()}>
             Save Lineup
           </button>
         </div>
