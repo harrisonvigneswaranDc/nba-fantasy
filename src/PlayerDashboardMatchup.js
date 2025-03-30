@@ -211,7 +211,7 @@ function PlayerDashboardMatchup() {
         hasAddedDailyScoreRef.current = true;
         
         // Check if overallTeamAScore is double the stored score.
-        if (overallTeamAScore === storedTeamAScore * 2) {
+        if (overallTeamAScore === storedTeamAScore * 2 || overallTeamAScore === overallTeamAScore * 2 ) {
           overallTeamAScore = overallTeamAScore - dailyScoreTeamA;
           overallTeamBScore = overallTeamBScore - dailyScoreTeamB;
           console.log("Detected double addition; subtracted dailyScoreTeamA");

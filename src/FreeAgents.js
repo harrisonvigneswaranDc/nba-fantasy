@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "./FreeAgents.css";
 import Header from "./Header";
 
@@ -9,6 +10,10 @@ function FreeAgents() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState("");
   const [positionFilter, setPositionFilter] = useState("");
+  const [error, setError] = useState("");
+
+  // Replace with your method of determining the logged in user's team ID.
+  const userTeamId = 1; // Example team id
 
   useEffect(() => {
     fetch("http://localhost:3001/freeagents", { credentials: "include" })
@@ -19,7 +24,9 @@ function FreeAgents() {
         return response.json();
       })
       .then((data) => setPlayers(data))
-      .catch((error) => console.error("Error fetching free agents:", error));
+      .catch((error) =>
+        console.error("Error fetching free agents:", error)
+      );
   }, []);
 
   // Filter players based on search query
@@ -79,6 +86,48 @@ function FreeAgents() {
     setCurrentPage(1);
   };
 
+  // Handler for the ADD button
+  // In FreeAgents.js
+const handleAddFreeAgent = async (player) => {
+  try {
+    // Determine the contract amount based on salary rules.
+    // For free agents with a salary >= 178000000, only a 5M contract is allowed.
+    // Otherwise, the contract amount is set to the player's salary.
+    let contractAmount = Number(player.salary);
+    if (contractAmount >= 178000000) {
+      contractAmount = 5000000;
+    }
+    // Create the payload for updating the roster.
+    const payload = {
+      team_id: userTeamId,
+      player_id: player.player_id,
+      contract_amount: contractAmount,
+      // Set the default category for a new free agent addition.
+      category: "reserve"
+    };
+
+    // Call the API to update the roster.
+    const updateRes = await fetch("http://localhost:3001/update-roster", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload)
+    });
+
+    if (!updateRes.ok) {
+      const errorData = await updateRes.json();
+      throw new Error(errorData.error || "Failed to add free agent");
+    }
+
+    alert("Player added successfully!");
+    // Optionally, update local state to remove the player from the free agents list.
+  } catch (err) {
+    console.error("Error adding free agent:", err);
+    alert("Error adding free agent: " + err.message);
+  }
+};
+
+
   return (
     <div className="free-agents-page">
       <Header />
@@ -109,10 +158,10 @@ function FreeAgents() {
           value={sortType}
           onChange={handleSortChange}
         >
-          <option value="">Filter by Stats</option>
-          <option value="pts">pts</option>
-          <option value="rb">rb</option>
-          <option value="ast">ast</option>
+          <option value="">Sort by Stat</option>
+          <option value="pts">PTS</option>
+          <option value="rb">REB</option>
+          <option value="ast">AST</option>
         </select>
         <button className="refresh-btn" onClick={resetEv}>
           Refresh
@@ -153,7 +202,12 @@ function FreeAgents() {
                 <td>{player.blk}</td>
                 <td>{player.tov}</td>
                 <td>
-                  <button className="add-btn">ADD</button>
+                  <button
+                    className="add-btn"
+                    onClick={() => handleAddFreeAgent(player)}
+                  >
+                    ADD
+                  </button>
                 </td>
               </tr>
             ))}
@@ -189,7 +243,7 @@ function FreeAgents() {
             - If the roster is full, a pop-up appears with “Select a player to drop.”
           </li>
           <li>
-            - If any rules (e.g. salary cap) are violated, show a “Warning” prompt.
+            - If any rules (e.g. salary cap or roster size) are violated, a warning is shown.
           </li>
         </ul>
       </div>

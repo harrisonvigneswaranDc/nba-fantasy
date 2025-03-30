@@ -5,7 +5,6 @@ import Header from "./Header";
 function PlayerDashboardRoster() {
   // STATES
   const [roster, setRoster] = useState([]);
-  const [gamesPlayed, setGamesPlayed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
@@ -14,6 +13,7 @@ function PlayerDashboardRoster() {
     season_end: "",
     league_name: ""
   });
+  const [rosterLocked, setRosterLocked] = useState(false);
 
   // SALARY CAP SETTINGS
   const SALARY_CAP_RULES = {
@@ -25,29 +25,21 @@ function PlayerDashboardRoster() {
 
   // CALCULATE PAYROLL AND TAXES
   const payroll = roster.reduce((sum, p) => sum + Number(p.salary || 0), 0);
-  const tier1Excess =
-    payroll > SALARY_CAP_RULES.softCap
-      ? Math.min(payroll - SALARY_CAP_RULES.softCap, 31000000)
-      : 0;
+  const tier1Excess = payroll > SALARY_CAP_RULES.softCap ? Math.min(payroll - SALARY_CAP_RULES.softCap, 31000000) : 0;
   const tier1Tax = tier1Excess * 1.5;
-  const tier2Excess =
-    payroll > SALARY_CAP_RULES.firstApron
-      ? Math.min(payroll - SALARY_CAP_RULES.firstApron, 11000000)
-      : 0;
+  const tier2Excess = payroll > SALARY_CAP_RULES.firstApron ? Math.min(payroll - SALARY_CAP_RULES.firstApron, 11000000) : 0;
   const tier2Tax = tier2Excess * 2;
-  const tier3Excess =
-    payroll > SALARY_CAP_RULES.hardCap ? payroll - SALARY_CAP_RULES.hardCap : 0;
+  const tier3Excess = payroll > SALARY_CAP_RULES.hardCap ? payroll - SALARY_CAP_RULES.hardCap : 0;
   const tier3Tax = tier3Excess * 3;
   const totalTax = tier1Tax + tier2Tax + tier3Tax;
 
-  const capStage =
-    payroll <= SALARY_CAP_RULES.softCap
-      ? "Below Soft Cap"
-      : payroll <= SALARY_CAP_RULES.firstApron
-      ? "Soft Cap"
-      : payroll <= SALARY_CAP_RULES.hardCap
-      ? "First Apron"
-      : "Second Apron (Hard Cap)";
+  const capStage = payroll <= SALARY_CAP_RULES.softCap
+    ? "Below Soft Cap"
+    : payroll <= SALARY_CAP_RULES.firstApron
+    ? "Soft Cap"
+    : payroll <= SALARY_CAP_RULES.hardCap
+    ? "First Apron"
+    : "Second Apron (Hard Cap)";
 
   const getCapColor = (payroll) => {
     if (payroll <= SALARY_CAP_RULES.softCap) return "#4caf50";
@@ -83,6 +75,21 @@ function PlayerDashboardRoster() {
       });
   }, []);
 
+  // FETCH ROSTER LOCK STATUS for a given date
+  const fetchLockStatus = (date) => {
+    fetch(`http://localhost:3001/roster/is-locked?gameDate=${date}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch lock status");
+        return res.json();
+      })
+      .then((data) => {
+        setRosterLocked(data.isLocked);
+      })
+      .catch((err) => {
+        console.error("Error checking lock status:", err);
+      });
+  };
+
   // FETCH ROSTER FOR SELECTED DATE
   const fetchRoster = (date) => {
     setLoading(true);
@@ -99,46 +106,17 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
-  // FETCH GAMES PLAYED
-  const fetchGamesPlayed = () => {
-    setLoading(true);
-    fetch("http://localhost:3001/games-played", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch games played");
-        return res.json();
-      })
-      .then((data) => setGamesPlayed(data))
-      .catch((error) => {
-        console.error("Error fetching games played:", error);
-        setErrorMsg("Error fetching games played");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  // Re-fetch roster when selectedDate changes
+  // Combined effect to fetch both lock status and roster whenever selectedDate changes
   useEffect(() => {
-    if (selectedDate) {
-      fetchRoster(selectedDate);
-    }
+    if (!selectedDate) return;
+    fetchLockStatus(selectedDate);
+    fetchRoster(selectedDate);
   }, [selectedDate]);
-
-  // Fetch games played on mount
-  useEffect(() => {
-    fetchGamesPlayed();
-  }, []);
-
-  // Determine if roster is locked by either any player having been picked or if a game has been played on the selected date.
-  const rosterLocked =
-    roster.some((player) => player.roster_picked === true) ||
-    gamesPlayed.some((game) => game.game_date === selectedDate);
 
   // Roster filters by category
   const starters = roster.filter((player) => player.category === "starter");
   const bench = roster.filter((player) => player.category === "bench");
   const reserve = roster.filter((player) => player.category === "reserve");
-
-  // Helper function: returns true if player action buttons should be shown
-  const showPlayerButtons = () => !rosterLocked;
 
   // Handler for editing player category (only allowed if not locked)
   const handleChangeCategory = (playerId, newCategory) => {
@@ -159,36 +137,47 @@ function PlayerDashboardRoster() {
       .catch((error) => console.error("Error updating category:", error));
   };
 
-  // Save lineup handler with validations.
-  // If no argument is provided, it uses the current roster state.
-  const handleSaveLineup = (rosterToSave = roster) => {
-    if (!Array.isArray(rosterToSave)) {
-      console.error("Expected rosterToSave to be an array:", rosterToSave);
-      return;
-    }
-    setErrorMsg("");
-    const startersFiltered = rosterToSave.filter((player) => player.category === "starter");
-    const benchFiltered = rosterToSave.filter((player) => player.category === "bench");
-    const reserveFiltered = rosterToSave.filter((player) => player.category === "reserve");
+  // Handler to remove a player.
+  // This sends a POST request to the /roster/remove endpoint.
+  const handleRemovePlayer = (playerId) => {
+    if (rosterLocked) return;
+    fetch("http://localhost:3001/roster/remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ playerId, gameDate: selectedDate }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to remove player");
+        return res.json();
+      })
+      .then(() => {
+        // Refresh the roster to update the UI.
+        fetchRoster(selectedDate);
+      })
+      .catch((error) => console.error("Error removing player:", error));
+  };
 
-    if (startersFiltered.length !== 5) {
+  // Save lineup handler with validations.
+  const handleSaveLineup = () => {
+    setErrorMsg("");
+    if (starters.length !== 5) {
       setErrorMsg("You must have exactly 5 starters.");
       return;
     }
-    if (benchFiltered.length !== 4) {
+    if (bench.length !== 4) {
       setErrorMsg("You must have exactly 4 bench players.");
       return;
     }
-    if (reserveFiltered.length > 6) {
+    if (reserve.length !== 6) {
       setErrorMsg("You must have exactly 6 reserve players.");
       return;
     }
-
     fetch("http://localhost:3001/roster/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ roster: rosterToSave, gameDate: selectedDate }),
+      body: JSON.stringify({ roster, gameDate: selectedDate }),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to save lineup");
@@ -200,17 +189,8 @@ function PlayerDashboardRoster() {
       })
       .catch((error) => {
         console.error("Error saving lineup:", error);
-        setErrorMsg("Error saving lineup: " + error.message);
+        setErrorMsg("Error saving lineup. Please try again.");
       });
-  };
-
-  // Handler to remove a player.
-  // This version creates an updated roster array (without the removed player)
-  // and then calls handleSaveLineup with that updated array.
-  const handleRemovePlayer = (playerId) => {
-    if (rosterLocked) return;
-    const updatedRoster = roster.filter((player) => player.player_id !== playerId);
-    handleSaveLineup(updatedRoster);
   };
 
   // Date navigation handlers
@@ -247,9 +227,7 @@ function PlayerDashboardRoster() {
           </p>
         </div>
         <div className="date-controls">
-          <button onClick={handlePrevDay} disabled={selectedDate === seasonRange.season_start}>
-            ◀
-          </button>
+          <button onClick={handlePrevDay} disabled={selectedDate === seasonRange.season_start}>◀</button>
           <input
             type="date"
             value={selectedDate}
@@ -257,9 +235,7 @@ function PlayerDashboardRoster() {
             max={seasonRange.season_end}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
-          <button onClick={handleNextDay} disabled={selectedDate === seasonRange.season_end}>
-            ▶
-          </button>
+          <button onClick={handleNextDay} disabled={selectedDate === seasonRange.season_end}>▶</button>
         </div>
         {rosterLocked && (
           <span className="locked-message">
@@ -287,18 +263,10 @@ function PlayerDashboardRoster() {
           ></div>
         </div>
         <div className="tax-breakdown">
-          <div>
-            Tier 1: ${tier1Excess.toLocaleString()} taxed at 1.5× = ${tier1Tax.toLocaleString()}
-          </div>
-          <div>
-            Tier 2: ${tier2Excess.toLocaleString()} taxed at 2× = ${tier2Tax.toLocaleString()}
-          </div>
-          <div>
-            Tier 3: ${tier3Excess.toLocaleString()} taxed at 3× = ${tier3Tax.toLocaleString()}
-          </div>
-          <div>
-            <strong>Total Tax Owed:</strong> ${totalTax.toLocaleString()}
-          </div>
+          <div>Tier 1: ${tier1Excess.toLocaleString()} taxed at 1.5× = ${tier1Tax.toLocaleString()}</div>
+          <div>Tier 2: ${tier2Excess.toLocaleString()} taxed at 2× = ${tier2Tax.toLocaleString()}</div>
+          <div>Tier 3: ${tier3Excess.toLocaleString()} taxed at 3× = ${tier3Tax.toLocaleString()}</div>
+          <div><strong>Total Tax Owed:</strong> ${totalTax.toLocaleString()}</div>
         </div>
       </div>
 
@@ -313,10 +281,9 @@ function PlayerDashboardRoster() {
                 starters.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {Number(player.salary).toLocaleString()}
+                      <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
-                    {showPlayerButtons() && (
+                    {!rosterLocked && (
                       <div className="player-buttons">
                         <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
                         <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
@@ -339,10 +306,9 @@ function PlayerDashboardRoster() {
                 bench.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {Number(player.salary).toLocaleString()}
+                      <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
-                    {showPlayerButtons() && (
+                    {!rosterLocked && (
                       <div className="player-buttons">
                         <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
                         <button onClick={() => handleChangeCategory(player.player_id, "starter")}>START</button>
@@ -365,10 +331,9 @@ function PlayerDashboardRoster() {
                 reserve.map((player) => (
                   <li key={player.player_id} className="player-item">
                     <div className="player-info">
-                      <strong>{player.player_name}</strong> ({player.pos}) - $
-                      {Number(player.salary).toLocaleString()}
+                      <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
-                    {showPlayerButtons() && (
+                    {!rosterLocked && (
                       <div className="player-buttons">
                         <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
                         <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
@@ -386,13 +351,14 @@ function PlayerDashboardRoster() {
       </div>
 
       {/* Save Lineup Button */}
-      {showPlayerButtons() && (
+      {!rosterLocked && (
         <div className="lineup-buttons">
-          <button className="save-btn" onClick={() => handleSaveLineup()}>
+          <button className="save-btn" onClick={handleSaveLineup}>
             Save Lineup
           </button>
         </div>
       )}
+      {errorMsg && <div className="error-message">{errorMsg}</div>}
     </div>
   );
 }

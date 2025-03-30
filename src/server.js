@@ -208,18 +208,16 @@ app.post("/roster/category", async (req, res) => {
   }
 });
 
-// POST /roster/remove endpoint: Remove a player, update player_picked, and subtract player's salary from team's salary.
+// POST /roster/remove
 app.post("/roster/remove", async (req, res) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ error: "Not authenticated." });
-  }
   const { playerId, gameDate } = req.body;
   if (!playerId) {
     return res.status(400).json({ error: "Missing playerId." });
   }
+
   try {
+    // Retrieve the current user's team (assume authentication middleware has set req.user)
     const userId = req.user.user_id;
-    // Retrieve the user's team (and league) info.
     const teamResult = await pool.query(
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
       [userId]
@@ -232,18 +230,18 @@ app.post("/roster/remove", async (req, res) => {
     // Begin transaction.
     await pool.query("BEGIN");
 
-    // Fetch the player's salary.
+    // Fetch the player's salary from the players table.
     const playerResult = await pool.query(
       "SELECT salary FROM players WHERE player_id = $1 AND league_id = $2",
       [playerId, league_id]
     );
-    if (playerResult.rows.length === 0) {
+    if (playerResult.rowCount === 0) {
       await pool.query("ROLLBACK");
       return res.status(404).json({ error: "Player not found in league" });
     }
     const playerSalary = Number(playerResult.rows[0].salary);
 
-    // Update the player's record to mark them as not picked.
+    // Mark the player as not picked.
     await pool.query(
       "UPDATE players SET player_picked = false WHERE player_id = $1",
       [playerId]
@@ -255,13 +253,13 @@ app.post("/roster/remove", async (req, res) => {
       [playerSalary, team_id]
     );
 
-    // Remove the player from the active roster.
+    // Remove the player from the roster. Depending on your schema, you might be deleting from a table like "rosters" or "roster_schedule".
     await pool.query(
       "DELETE FROM rosters WHERE team_id = $1 AND player_id = $2",
       [team_id, playerId]
     );
 
-    // Optionally remove from the roster_schedule for the specific game date, if provided.
+    // Optionally, if you have a roster_schedule table that you need to update:
     if (gameDate) {
       await pool.query(
         "DELETE FROM roster_schedule WHERE team_id = $1 AND player_id = $2 AND schedule_date = $3",
@@ -270,10 +268,10 @@ app.post("/roster/remove", async (req, res) => {
     }
 
     await pool.query("COMMIT");
-    res.json({ success: true, message: "Player removed successfully." });
+    res.json({ success: true });
   } catch (error) {
     await pool.query("ROLLBACK");
-    console.error("Error removing player:", error);
+    console.error("Error in /roster/remove:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -542,19 +540,17 @@ ORDER BY rc.team_id, rc.game_date, p.player ASC;
   }
 });
 
-
-
-
 app.get("/league-info", async (req, res) => {
+  // Ensure the user is authenticated.
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
 
   try {
     const userId = req.user.user_id;
-    // Get the user's team to determine the league.
+    // Get the user's team (and league id) from the teams table.
     const teamResult = await pool.query(
-      "SELECT league_id FROM teams WHERE user_id = $1",
+      "SELECT team_id, league_id FROM teams WHERE user_id = $1",
       [userId]
     );
     if (teamResult.rows.length === 0) {
@@ -562,21 +558,33 @@ app.get("/league-info", async (req, res) => {
     }
     const { league_id } = teamResult.rows[0];
 
-    // Retrieve league information, including season_start and season_end.
+    // Fetch league information from the leagues table.
     const leagueResult = await pool.query(
-      "SELECT league_name, season_start, season_end FROM leagues WHERE league_id = $1",
+      "SELECT league_id, league_name, draft_time, season_start, season_end FROM leagues WHERE league_id = $1",
       [league_id]
     );
     if (leagueResult.rows.length === 0) {
       return res.status(404).json({ error: "League not found." });
     }
-    res.json(leagueResult.rows[0]);
+    const leagueInfo = leagueResult.rows[0];
+
+    // Fetch all teams in this league along with wins, losses, and ties.
+    const teamsResult = await pool.query(
+      `SELECT team_id, team_name, wins, losses, ties 
+       FROM teams 
+       WHERE league_id = $1 
+       ORDER BY wins DESC, losses ASC, ties DESC`,
+      [league_id]
+    );
+    // Attach the teams array to the leagueInfo object.
+    leagueInfo.teams = teamsResult.rows;
+
+    res.json(leagueInfo);
   } catch (err) {
     console.error("Error fetching league info:", err);
-    res.status(500).json({ error: "Internal server error." });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 
 
@@ -598,22 +606,28 @@ app.get("/games-played", async (req, res) => {
     const gamesPlayedResult = await pool.query(
       `
       SELECT 
-        pgp.player_id,
-        p.player AS player_name,
-        p.pos,
-        p.salary,
-        pgp.game_date_played,
-        pgp.roster_picked,
-        pgp.pts,
-        pgp.reb,
-        pgp.ast,
-        pgp.stl,
-        pgp.blk
-      FROM player_games_played pgp
-      JOIN players p ON pgp.player_id = p.player_id
-      JOIN rosters r ON pgp.player_id = r.player_id AND r.team_id = $1
-      WHERE pgp.game_date_played = $2
-      ORDER BY pgp.game_date_played DESC;
+  pgp.player_id,
+  p.player AS player_name,
+  p.pos,
+  p.salary,
+  pgp.game_date_played,
+  rs.category,           -- The category (e.g., starter/bench/reserve) from roster_schedule
+  pgp.pts,
+  pgp.reb,
+  pgp.ast,
+  pgp.stl,
+  pgp.blk
+FROM player_games_played pgp
+JOIN players p 
+  ON p.player_id = pgp.player_id
+JOIN roster_schedule rs 
+  ON rs.player_id = pgp.player_id
+  AND rs.schedule_date = pgp.game_date_played  -- match the date of the game
+  AND rs.team_id = $1                          -- match the team ID you’re interested in
+WHERE pgp.game_date_played = $2               -- the specific date you want (e.g., '2025-01-20')
+ORDER BY pgp.game_date_played DESC;
+
+
       `,
       [teamId, gameDate]
     );
@@ -967,6 +981,131 @@ app.post("/update-matchup-score", async (req, res) => {
 });
 
 
+app.post("/update-roster", async (req, res) => {
+  const { team_id, player_id, contract_amount } = req.body;
+  // Force the category to "reserve"
+  const category = "reserve";
+  try {
+    // 1) Check if the team's roster already has 15 players.
+    const rosterCountResult = await pool.query(
+      "SELECT COUNT(*) FROM rosters WHERE team_id = $1",
+      [team_id]
+    );
+    const rosterCount = Number(rosterCountResult.rows[0].count);
+    if (rosterCount >= 15) {
+      return res.status(400).json({ error: "Roster is full" });
+    }
+
+    // 2) Update the team's salary cap in the teams table.
+    await pool.query(
+      `UPDATE teams SET team_salary = team_salary + $1 
+       WHERE team_id = $2`,
+      [contract_amount, team_id]
+    );
+
+    // 3) Insert the new player into the rosters table with category "reserve".
+    //    Using ON CONFLICT to update the category if the record already exists.
+    await pool.query(
+      `INSERT INTO rosters (team_id, player_id, category)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (team_id, player_id)
+       DO UPDATE SET category = EXCLUDED.category;`,
+      [team_id, player_id, category]
+    );
+
+    // 4) Update the player's record in the players table to mark them as picked.
+    await pool.query(
+      `UPDATE players
+         SET player_picked = true
+       WHERE player_id = $1`,
+      [player_id]
+    );
+
+    return res.status(200).json({ message: "Roster updated successfully" });
+  } catch (err) {
+    console.error("Error updating roster:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/team-info", async (req, res) => {
+  // Ensure the user is authenticated.
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+
+  try {
+    const userId = req.user.user_id;
+    // Retrieve the user's team information
+    const teamResult = await pool.query(
+      "SELECT team_id, league_id, team_name, wins, losses, ties, team_salary FROM teams WHERE user_id = $1",
+      [userId]
+    );
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for user." });
+    }
+    const myTeam = teamResult.rows[0];
+
+    // Retrieve the league information for that team.
+    const leagueResult = await pool.query(
+      "SELECT league_id, league_name, draft_time, season_start, season_end FROM leagues WHERE league_id = $1",
+      [myTeam.league_id]
+    );
+    if (leagueResult.rows.length === 0) {
+      return res.status(404).json({ error: "League not found." });
+    }
+    const leagueInfo = leagueResult.rows[0];
+
+    // Return only the current user's team stats along with the league info.
+    res.json({
+      league: leagueInfo,
+      myTeam: myTeam
+    });
+  } catch (err) {
+    console.error("Error fetching league info:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /roster/is-locked?gameDate=YYYY-MM-DD
+app.get("/roster/is-locked", async (req, res) => {
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
+
+  const { gameDate } = req.query;
+  if (!gameDate) {
+    return res.status(400).json({ error: "Missing gameDate parameter" });
+  }
+
+  try {
+    // 1) Get the user’s team_id
+    const userId = req.user.user_id;
+    const teamResult = await pool.query(
+      "SELECT team_id FROM teams WHERE user_id = $1",
+      [userId]
+    );
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: "Team not found for this user" });
+    }
+    const teamId = teamResult.rows[0].team_id;
+
+    // 2) Check if the date is locked in locked_schedule (example)
+    //    This is just an example. If you store locked status differently,
+    //    adjust accordingly.
+    const lockedCheck = await pool.query(
+      "SELECT 1 FROM locked_schedule WHERE team_id = $1 AND locked_date = $2 LIMIT 1",
+      [teamId, gameDate]
+    );
+    const isLocked = lockedCheck.rows.length > 0;
+
+    // 3) Return { isLocked: true/false }
+    return res.json({ isLocked });
+  } catch (err) {
+    console.error("Error checking if roster is locked:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 
 const PORT = process.env.PORT || 3001;
