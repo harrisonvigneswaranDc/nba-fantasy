@@ -55,7 +55,7 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div className="App bg-gray-900">
       
         <Router>
           
@@ -74,7 +74,12 @@ function App() {
             </Routes>
           </main>
         </Router>
-
+      {/* Footer Area */}
+      <footer className="bg-gray-800 border-t border-gray-700 px-8 py-4 flex gap-6 justify-center text-gray-400 mt-10">
+        <span className="cursor-pointer hover:text-purple-400 transition-colors duration-200">[Privacy Policy]</span>
+        <span className="cursor-pointer hover:text-purple-400 transition-colors duration-200">[Terms of Service]</span>
+        <span className="cursor-pointer hover:text-purple-400 transition-colors duration-200">[Contact]</span>
+      </footer>
     </div>
   );
 }

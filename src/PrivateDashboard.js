@@ -8,7 +8,7 @@ import { Navigate } from "react-router-dom";
     useEffect(() => {
       // Check if user is authenticated by calling your profile endpoint
       fetch("http://localhost:3001/profile", {
-        credentials: "include", // ensures cookies are sent
+        credentials: "include", 
       })
         .then((res) => {
           if (res.ok) {

@@ -1,4 +1,4 @@
-// server.js
+
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -9,7 +9,7 @@ const { Pool } = require("pg");
 
 const app = express();
 
-// Enable CORS for your React app and allow credentials
+// Enable CORS for React app and allow for credentials
 app.use(
   cors({
     origin: "http://localhost:3000",
@@ -32,11 +32,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 const pool = new Pool({
-  user: "postgres",                // Replace with your PostgreSQL username
-  host: "localhost",               // Replace if your host is different
-  database: "postgres",            // The name of your database
-  password: "harri029",            // Replace with your PostgreSQL password
-  port: 5432,                      // Default PostgreSQL port
+  user: "postgres",                
+  host: "localhost",               
+  database: "postgres",            
+  password: "harri029",            
+  port: 5432,                      
 });
 
 passport.use(
@@ -110,7 +110,7 @@ app.post("/logout", (req, res) => {
 });
 
 
-// GET /freeagents endpoint to fetch available players
+// The endpoint to fetch available players
 app.get("/freeagents", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
@@ -118,7 +118,7 @@ app.get("/freeagents", async (req, res) => {
 
   const userId = req.user.user_id;
   try {
-    // First, get the user's league.
+    // Get the user's league.
     const teamResult = await pool.query("SELECT league_id FROM teams WHERE user_id = $1", [userId]);
     if (teamResult.rows.length === 0) {
       return res.status(404).json({ error: "User's team not found" });
@@ -139,11 +139,7 @@ app.get("/freeagents", async (req, res) => {
 
 
 
-
-
-
-// POST /roster/category endpoint to update a player's category
-// POST /roster/category endpoint to update a player's daily category
+// The endpoint to update a player's daily category
 app.post("/roster/category", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
@@ -163,7 +159,7 @@ app.post("/roster/category", async (req, res) => {
     }
     const teamId = teamResult.rows[0].team_id;
 
-    // 🔒 Check if gameDate is locked
+    // Check if gameDate is locked
     const lockedCheck = await pool.query(
       "SELECT 1 FROM locked_schedule WHERE team_id = $1 AND locked_date = $2 LIMIT 1",
       [teamId, gameDate]
@@ -192,7 +188,7 @@ app.post("/roster/category", async (req, res) => {
       return res.status(404).json({ error: "Player not found on your roster" });
     }
 
-    // ✅ Upsert into roster_schedule
+    
     await pool.query(
       `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
        VALUES ($1, $2, $3, $4)
@@ -208,7 +204,7 @@ app.post("/roster/category", async (req, res) => {
   }
 });
 
-// POST /roster/remove
+//  roster remove
 app.post("/roster/remove", async (req, res) => {
   const { playerId, gameDate } = req.body;
   if (!playerId) {
@@ -216,7 +212,7 @@ app.post("/roster/remove", async (req, res) => {
   }
 
   try {
-    // Retrieve the current user's team (assume authentication middleware has set req.user)
+    // Retrieve the current user's team and league
     const userId = req.user.user_id;
     const teamResult = await pool.query(
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
@@ -227,10 +223,10 @@ app.post("/roster/remove", async (req, res) => {
     }
     const { team_id, league_id } = teamResult.rows[0];
 
-    // Begin transaction.
+    // Begin transaction 
     await pool.query("BEGIN");
 
-    // Fetch the player's salary from the players table.
+    // Fetch the player's salary from the players table
     const playerResult = await pool.query(
       "SELECT salary FROM players WHERE player_id = $1 AND league_id = $2",
       [playerId, league_id]
@@ -241,25 +237,25 @@ app.post("/roster/remove", async (req, res) => {
     }
     const playerSalary = Number(playerResult.rows[0].salary);
 
-    // Mark the player as not picked.
+    // Mark the player as not picked 
     await pool.query(
       "UPDATE players SET player_picked = false WHERE player_id = $1",
       [playerId]
     );
 
-    // Subtract the player's salary from the team's salary.
+    // Subtract the player's salary from the team's salary 
     await pool.query(
       "UPDATE teams SET team_salary = team_salary - $1 WHERE team_id = $2",
       [playerSalary, team_id]
     );
 
-    // Remove the player from the roster. Depending on your schema, you might be deleting from a table like "rosters" or "roster_schedule".
+    // Remove the player from the roster 
     await pool.query(
       "DELETE FROM rosters WHERE team_id = $1 AND player_id = $2",
       [team_id, playerId]
     );
 
-    // Optionally, if you have a roster_schedule table that you need to update:
+    
     if (gameDate) {
       await pool.query(
         "DELETE FROM roster_schedule WHERE team_id = $1 AND player_id = $2 AND schedule_date = $3",
@@ -278,10 +274,6 @@ app.post("/roster/remove", async (req, res) => {
 
 
 
-
-// POST /roster/save endpoint to update the lineup for a given game date.
-// It only updates if there is no played record (with roster_picked true) for that date.
-// POST /roster/save endpoint to update the entire lineup for a given game date.
 // POST /roster/save endpoint to update the entire lineup for a given game date.
 app.post("/roster/save", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
@@ -307,7 +299,7 @@ app.post("/roster/save", async (req, res) => {
 
     const teamId = teamResult.rows[0].team_id;
 
-    // 🛑 Check if this date is locked in locked_schedule for the team
+    // Check if this date is locked in locked schedule for the team
     const lockedCheck = await pool.query(
       `SELECT 1 FROM locked_schedule 
        WHERE team_id = $1 AND locked_date = $2 
@@ -387,7 +379,7 @@ app.get("/trade-setup", async (req, res) => {
       [league_id]
     );
 
-    // Get rosters for all teams in the league, but only for players that belong to that league.
+    // Get rosters for all teams in the league, but only for players that belong to that league
     const rostersResult = await pool.query(
       `SELECT r.team_id, r.player_id, r.category, p.player AS player_name, p.pos, p.salary
        FROM rosters r
@@ -410,8 +402,6 @@ app.get("/trade-setup", async (req, res) => {
 });
 
 
-
-
 // Make sure to include your authentication middleware before this route.
 app.get("/matchup-season", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
@@ -425,12 +415,13 @@ app.get("/matchup-season", async (req, res) => {
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
       [userId]
     );
+    console.log("User ID:", req.user.user_id);
     if (teamResult.rows.length === 0) {
       return res.status(404).json({ error: "User's team not found" });
     }
     const { team_id, league_id } = teamResult.rows[0];
 
-    // Find an active (or upcoming) matchup for the user's league that includes their team.
+    // Find an active/upcoming matchup for the user's league that includes their team
     const matchupQuery = `
      SELECT
   m.matchup_id,
@@ -460,8 +451,8 @@ LIMIT 1;
     }
     const matchup = matchupResult.rows[0];
 
-    // Build a date series from matchup start_date to end_date.
-    // Then, combine the game stats from player_games_played.
+    // a date series from matchup start date to end date
+    // combine the game stats from player games played
     const statsQuery = `
       WITH date_series AS (
   SELECT generate_series($1::date, $2::date, interval '1 day') AS game_date
@@ -541,14 +532,14 @@ ORDER BY rc.team_id, rc.game_date, p.player ASC;
 });
 
 app.get("/league-info", async (req, res) => {
-  // Ensure the user is authenticated.
+  // Ensure the user is authenticated
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
 
   try {
     const userId = req.user.user_id;
-    // Get the user's team (and league id) from the teams table.
+    // Get the users team  from the teams table.
     const teamResult = await pool.query(
       "SELECT team_id, league_id FROM teams WHERE user_id = $1",
       [userId]
@@ -558,7 +549,7 @@ app.get("/league-info", async (req, res) => {
     }
     const { league_id } = teamResult.rows[0];
 
-    // Fetch league information from the leagues table.
+    // Fetch league information from the leagues table
     const leagueResult = await pool.query(
       "SELECT league_id, league_name, draft_time, season_start, season_end FROM leagues WHERE league_id = $1",
       [league_id]
@@ -568,7 +559,7 @@ app.get("/league-info", async (req, res) => {
     }
     const leagueInfo = leagueResult.rows[0];
 
-    // Fetch all teams in this league along with wins, losses, and ties.
+    // Fetch all teams in this league along with wins/loss/ties.
     const teamsResult = await pool.query(
       `SELECT team_id, team_name, wins, losses, ties 
        FROM teams 
@@ -576,7 +567,7 @@ app.get("/league-info", async (req, res) => {
        ORDER BY wins DESC, losses ASC, ties DESC`,
       [league_id]
     );
-    // Attach the teams array to the leagueInfo object.
+    // Attach the teams array to the leagueInfo object
     leagueInfo.teams = teamsResult.rows;
 
     res.json(leagueInfo);
@@ -589,8 +580,7 @@ app.get("/league-info", async (req, res) => {
 
 
 
-// GET /games-played endpoint to fetch games played
-// GET /games-played endpoint to fetch games played
+// The endpoint to fetch games played by a specific team on a specific date.
 app.get("/games-played", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
@@ -640,9 +630,6 @@ ORDER BY pgp.game_date_played DESC;
 });
 
 // Endpoint to lock the schedule for a specific game date.
-
-// New Endpoint: Lock the Schedule for a Specific Date
-// This copies active schedule rows into locked_schedule, making them immutable.
 app.post("/roster/lock", async (req, res) => {
   const { lockDate } = req.body; // e.g., "2025-01-20"
   if (!lockDate) {
@@ -657,8 +644,7 @@ app.post("/roster/lock", async (req, res) => {
       WHERE schedule_date = '2025-01-20'
     
     `);
-    // Optionally, delete active rows for that date:
-    // await pool.query(`DELETE FROM roster_schedule WHERE schedule_date = $1`, [lockDate]);
+    //  delete active rows for that date
     await pool.query("COMMIT");
     res.json({ success: true, message: `Schedule locked for ${lockDate}.` });
   } catch (err) {
@@ -668,13 +654,13 @@ app.post("/roster/lock", async (req, res) => {
   }
 });
 
-// GET /roster endpoint: Return locked schedule if the date is locked, else active data.
+//  Return locked schedule if the date is locked, else active data.
 app.get("/roster", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
   try {
-    const { gameDate, teamId } = req.query; // Now expecting teamId
+    const { gameDate, teamId } = req.query; 
     const userId = req.user.user_id;
     const teamResult = await pool.query("SELECT team_id FROM teams WHERE user_id = $1", [userId]);
     if (teamResult.rows.length === 0) {
@@ -682,16 +668,15 @@ app.get("/roster", async (req, res) => {
     }
     const originalTeamId = teamResult.rows[0].team_id;
 
-//if teamID is not in the query select the current user id
     const currentTeamID = teamId || originalTeamId
 
-    // Check if the gameDate is locked.
+    // Check if the game date is locked.
     const lockedCheck = await pool.query(
       "SELECT COUNT(*) AS cnt FROM locked_schedule WHERE locked_date = $1",
       [gameDate]
     );
     if (parseInt(lockedCheck.rows[0].cnt, 10) > 0) {
-      // Return data from locked_schedule.
+      // Return data from locked_schedule
       const lockedRoster = await pool.query(
         `SELECT ls.team_id, ls.player_id, ls.locked_date AS schedule_date, ls.category,
                 p.player AS player_name, p.pos, p.salary
@@ -703,7 +688,7 @@ app.get("/roster", async (req, res) => {
       );
       return res.json(lockedRoster.rows);
     } else {
-      // Return active roster and schedule (join rosters and roster_schedule).
+      // Return active roster and schedule 
       const rosterResult = await pool.query(
         `SELECT 
            r.team_id, 
@@ -730,7 +715,7 @@ app.get("/roster", async (req, res) => {
   }
 });
 
-// POST /execute-trade endpoint: Update only the rosters (active schedule remains unchanged).
+// Update only the rosters 
 app.post("/execute-trade", async (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Authentication required" });
@@ -742,7 +727,7 @@ app.post("/execute-trade", async (req, res) => {
   try {
     await pool.query("BEGIN");
 
-    // Process trades for players moving from team1 to team2.
+    // Process trades for players moving from team to team
     for (const playerId of team1Players) {
       await pool.query(
         "DELETE FROM rosters WHERE team_id = $1 AND player_id = $2",
@@ -754,7 +739,7 @@ app.post("/execute-trade", async (req, res) => {
       );
     }
 
-    // Process trades for players moving from team2 to team1.
+    // Process trades for players moving from team to team
     for (const playerId of team2Players) {
       await pool.query(
         "DELETE FROM rosters WHERE team_id = $1 AND player_id = $2",
@@ -766,7 +751,7 @@ app.post("/execute-trade", async (req, res) => {
       );
     }
 
-    // Note: We do NOT update or delete any rows in locked_schedule.
+    
     await pool.query("COMMIT");
     res.json({
       success: true,
@@ -779,15 +764,14 @@ app.post("/execute-trade", async (req, res) => {
   }
 });
 
-// POST /reset-draft endpoint: Clear only active rosters and roster_schedule.
-// Locked schedule remains unchanged.
+//Reste Everything for the matchups/schdules, rosters players and so on
 app.post("/reset-draft", async (req, res) => {
   const { leagueId } = req.body;
 
   try {
     await pool.query("BEGIN");
 
-    // 0) Clear locked_schedule
+    
     await pool.query(`
       DELETE FROM locked_schedule
       WHERE team_id IN (
@@ -795,7 +779,7 @@ app.post("/reset-draft", async (req, res) => {
       )
     `, [leagueId]);
 
-    // 1) Clear roster_schedule
+    
     await pool.query(`
       DELETE FROM roster_schedule
       WHERE team_id IN (
@@ -803,7 +787,7 @@ app.post("/reset-draft", async (req, res) => {
       )
     `, [leagueId]);
 
-    // 2) Clear rosters
+   
     await pool.query(`
       DELETE FROM rosters
       WHERE team_id IN (
@@ -811,21 +795,21 @@ app.post("/reset-draft", async (req, res) => {
       )
     `, [leagueId]);
 
-    // 3) Reset player picked flag
+    
     await pool.query(`
       UPDATE players
       SET player_picked = false
       WHERE league_id = $1
     `, [leagueId]);
 
-    // 4) Reset team salary
+    
     await pool.query(`
       UPDATE teams
       SET team_salary = 0
       WHERE league_id = $1
     `, [leagueId]);
 
-    // 4) Reset team salary
+    
     await pool.query(`
       UPDATE matchups
   SET team_a_score = 0,
@@ -843,7 +827,7 @@ app.post("/reset-draft", async (req, res) => {
 });
 
 
-// Other endpoints (make-pick, teams-for-league, league-players, matchup-season, league-info) remain unchanged.
+
 app.post("/make-pick", async (req, res) => {
   const { teamId, playerId } = req.body;
   const LOCKED_DATE = "2025-01-20"; // Fixed schedule lock date
@@ -851,7 +835,7 @@ app.post("/make-pick", async (req, res) => {
   try {
     await pool.query("BEGIN");
 
-    // 1. Get the league ID for the team
+    // Get the league ID for the team
     const teamResult = await pool.query(
       "SELECT league_id FROM teams WHERE team_id = $1",
       [teamId]
@@ -859,7 +843,7 @@ app.post("/make-pick", async (req, res) => {
     if (teamResult.rows.length === 0) throw new Error("Team not found.");
     const leagueId = teamResult.rows[0].league_id;
 
-    // 2. Make sure the player is in the league and not already picked
+    // Make sure the player is in the league and not already picked
     const playerResult = await pool.query(
       "SELECT player_picked, salary FROM players WHERE player_id = $1 AND league_id = $2",
       [playerId, leagueId]
@@ -868,7 +852,7 @@ app.post("/make-pick", async (req, res) => {
     if (playerResult.rows[0].player_picked) throw new Error("Player has already been picked.");
     const playerSalary = parseFloat(playerResult.rows[0].salary);
 
-    // 3. Determine roster slot based on current count
+    // Determine based on current count
     const countResult = await pool.query(
       "SELECT COUNT(*) AS cnt FROM rosters WHERE team_id = $1",
       [teamId]
@@ -880,19 +864,19 @@ app.post("/make-pick", async (req, res) => {
     else if (count < 15) category = "reserve";
     else throw new Error("Team already has 15 players.");
 
-    // 4. Mark player as picked
+    
     await pool.query(
       "UPDATE players SET player_picked = true WHERE player_id = $1 AND league_id = $2",
       [playerId, leagueId]
     );
 
-    // 5. Add player to roster
+    
     await pool.query(
       "INSERT INTO rosters (team_id, player_id, category) VALUES ($1, $2, $3)",
       [teamId, playerId, category]
     );
 
-    // 6. Add to roster_schedule for locked date
+    
     await pool.query(
       `INSERT INTO roster_schedule (team_id, player_id, schedule_date, category)
        VALUES ($1, $2, $3, $4)
@@ -901,14 +885,14 @@ app.post("/make-pick", async (req, res) => {
       [teamId, playerId, LOCKED_DATE, category]
     );
 
-    // 7. Also insert into locked_schedule to preserve record
+    
     await pool.query(
       `INSERT INTO locked_schedule (team_id, player_id, locked_date, category)
        VALUES ($1, $2, $3, $4)`,
       [teamId, playerId, LOCKED_DATE, category]
     );
 
-    // 8. Update salary cap
+    
     await pool.query(
       "UPDATE teams SET team_salary = team_salary + $1 WHERE team_id = $2",
       [playerSalary, teamId]
@@ -955,7 +939,7 @@ app.get("/league-players", async (req, res) => {
   }
 });
 
-// Endpoint: Update the matchup scores
+// Update the matchup scores
 app.post("/update-matchup-score", async (req, res) => {
   const { matchupId, overallTeamAScore, overallTeamBScore } = req.body;
   if (!matchupId || overallTeamAScore === undefined || overallTeamBScore === undefined) {
@@ -983,10 +967,10 @@ app.post("/update-matchup-score", async (req, res) => {
 
 app.post("/update-roster", async (req, res) => {
   const { team_id, player_id, contract_amount } = req.body;
-  // Force the category to "reserve"
+  // Make it reserve 
   const category = "reserve";
   try {
-    // 1) Check if the team's roster already has 15 players.
+    // Check if the team's roster has 15 players
     const rosterCountResult = await pool.query(
       "SELECT COUNT(*) FROM rosters WHERE team_id = $1",
       [team_id]
@@ -996,15 +980,14 @@ app.post("/update-roster", async (req, res) => {
       return res.status(400).json({ error: "Roster is full" });
     }
 
-    // 2) Update the team's salary cap in the teams table.
+    //Update the team's salary cap 
     await pool.query(
       `UPDATE teams SET team_salary = team_salary + $1 
        WHERE team_id = $2`,
       [contract_amount, team_id]
     );
 
-    // 3) Insert the new player into the rosters table with category "reserve".
-    //    Using ON CONFLICT to update the category if the record already exists.
+    // Check if the player is already on the roster
     await pool.query(
       `INSERT INTO rosters (team_id, player_id, category)
        VALUES ($1, $2, $3)
@@ -1013,7 +996,7 @@ app.post("/update-roster", async (req, res) => {
       [team_id, player_id, category]
     );
 
-    // 4) Update the player's record in the players table to mark them as picked.
+    //Update the player's record in the players table to mark them as picked
     await pool.query(
       `UPDATE players
          SET player_picked = true
@@ -1067,7 +1050,7 @@ app.get("/team-info", async (req, res) => {
   }
 });
 
-// GET /roster/is-locked?gameDate=YYYY-MM-DD
+// Endpoint to check if the roster is locked for a specific game date.
 app.get("/roster/is-locked", async (req, res) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: "Not authenticated." });
@@ -1079,7 +1062,7 @@ app.get("/roster/is-locked", async (req, res) => {
   }
 
   try {
-    // 1) Get the user’s team_id
+    
     const userId = req.user.user_id;
     const teamResult = await pool.query(
       "SELECT team_id FROM teams WHERE user_id = $1",
@@ -1090,16 +1073,14 @@ app.get("/roster/is-locked", async (req, res) => {
     }
     const teamId = teamResult.rows[0].team_id;
 
-    // 2) Check if the date is locked in locked_schedule (example)
-    //    This is just an example. If you store locked status differently,
-    //    adjust accordingly.
+   
     const lockedCheck = await pool.query(
       "SELECT 1 FROM locked_schedule WHERE team_id = $1 AND locked_date = $2 LIMIT 1",
       [teamId, gameDate]
     );
     const isLocked = lockedCheck.rows.length > 0;
 
-    // 3) Return { isLocked: true/false }
+    
     return res.json({ isLocked });
   } catch (err) {
     console.error("Error checking if roster is locked:", err);

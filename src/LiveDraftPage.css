@@ -70,4 +70,8 @@
   .cancel-btn:hover {
     background-color: #c82333;
   }
-  
+  .header-container {
+    margin: 0px;
+    padding: 0px;
+    width: 100%;
+  }

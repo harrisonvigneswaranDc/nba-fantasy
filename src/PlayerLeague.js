@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Header from "./Header";
-import { format } from "date-fns"; // optional: using date-fns for formatting
-import "./PlayerLeague.css";
+import { format } from "date-fns"; 
 
 function PlayerLeague() {
   const [leagueInfo, setLeagueInfo] = useState(null);
@@ -22,60 +21,68 @@ function PlayerLeague() {
       });
   }, []);
 
-  if (error) return <div>Error: {error}</div>;
-  if (!leagueInfo) return <div>Loading league info...</div>;
+  if (error) return <div className="bg-gray-900 text-red-500 p-4 text-center font-semibold">Error: {error}</div>;
+  if (!leagueInfo) return <div className="bg-gray-900 text-gray-300 p-4 text-center">Loading league info...</div>;
 
-  // Create Date objects from the ISO strings.
-  // Adding one day to season_start
+
   const seasonStartDate = new Date(leagueInfo.season_start);
   seasonStartDate.setDate(seasonStartDate.getDate());
   const seasonEndDate = new Date(leagueInfo.season_end);
   seasonEndDate.setDate(seasonEndDate.getDate());
 
-  // Format dates using date-fns (or you can use toISOString() if you prefer)
+
   const formattedStart = format(seasonStartDate, "yyyy-MM-dd");
   const formattedEnd = format(seasonEndDate, "yyyy-MM-dd");
 
   return (
-    <div className="league-page">
+    <div className="bg-gray-900 min-h-screen font-sans p-4">
       <Header />
-      <div className="league-info-box">
-        <p>
-          <strong>League Name:</strong> {leagueInfo.league_name}
-        </p>
-        <p>
-          <strong>Draft Time:</strong>{" "}
-          {new Date(leagueInfo.draft_time).toLocaleString()}
-        </p>
-        <p>
-          <strong>Season:</strong> {formattedStart} to {formattedEnd}
-        </p>
+      <div className="max-w-6xl mx-auto mt-6 space-y-6">
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-purple-900/20 transition-all duration-300">
+          <h2 className="text-xl font-bold mb-4 text-purple-400">League Information</h2>
+          <div className="text-gray-200 space-y-2">
+            <p>
+              <span className="font-semibold text-purple-300">League Name:</span> {leagueInfo.league_name}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-300">Draft Time:</span>{" "}
+              {new Date(leagueInfo.draft_time).toLocaleString()}
+            </p>
+            <p>
+              <span className="font-semibold text-purple-300">Season:</span> {formattedStart} to {formattedEnd}
+            </p>
+          </div>
+        </div>
+        
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-purple-900/20 transition-all duration-300">
+          <h2 className="text-xl font-bold mb-4 text-purple-400">League Standings</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-700">
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-purple-300 border-b border-gray-600">Rank</th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-purple-300 border-b border-gray-600">Team Name</th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-purple-300 border-b border-gray-600">Wins</th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-purple-300 border-b border-gray-600">Losses</th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-purple-300 border-b border-gray-600">Ties</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leagueInfo.teams.map((team, index) => (
+                  <tr key={team.team_id} className={index % 2 === 0 ? "bg-gray-800" : "bg-gray-700/50"}>
+                    <td className="py-3 px-4 text-sm text-gray-200 border-b border-gray-600">{index + 1}</td>
+                    <td className="py-3 px-4 text-sm text-gray-200 border-b border-gray-600">{team.team_name}</td>
+                    <td className="py-3 px-4 text-sm text-gray-200 border-b border-gray-600">{team.wins}</td>
+                    <td className="py-3 px-4 text-sm text-gray-200 border-b border-gray-600">{team.losses}</td>
+                    <td className="py-3 px-4 text-sm text-gray-200 border-b border-gray-600">{team.ties}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div className="league-standings">
-        <h2>League Standings</h2>
-        <table className="standings-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Team Name</th>
-              <th>Wins</th>
-              <th>Losses</th>
-              <th>Ties</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leagueInfo.teams.map((team, index) => (
-              <tr key={team.team_id}>
-                <td>{index + 1}</td>
-                <td>{team.team_name}</td>
-                <td>{team.wins}</td>
-                <td>{team.losses}</td>
-                <td>{team.ties}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+     
     </div>
   );
 }

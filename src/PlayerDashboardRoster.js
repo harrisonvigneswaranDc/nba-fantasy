@@ -42,10 +42,10 @@ function PlayerDashboardRoster() {
     : "Second Apron (Hard Cap)";
 
   const getCapColor = (payroll) => {
-    if (payroll <= SALARY_CAP_RULES.softCap) return "#4caf50";
-    if (payroll <= SALARY_CAP_RULES.firstApron) return "#ffc107";
-    if (payroll <= SALARY_CAP_RULES.hardCap) return "#ff9800";
-    return "#f44336";
+    if (payroll <= SALARY_CAP_RULES.softCap) return "bg-green-500";
+    if (payroll <= SALARY_CAP_RULES.firstApron) return "bg-yellow-500";
+    if (payroll <= SALARY_CAP_RULES.hardCap) return "bg-orange-500";
+    return "bg-red-500";
   };
 
   // FETCH LEAGUE INFO
@@ -106,7 +106,7 @@ function PlayerDashboardRoster() {
       .finally(() => setLoading(false));
   };
 
-  // Combined effect to fetch both lock status and roster whenever selectedDate changes
+  // Combined effect to fetch both lock status and roster whenever THE DATE CHANGES
   useEffect(() => {
     if (!selectedDate) return;
     fetchLockStatus(selectedDate);
@@ -118,7 +118,7 @@ function PlayerDashboardRoster() {
   const bench = roster.filter((player) => player.category === "bench");
   const reserve = roster.filter((player) => player.category === "reserve");
 
-  // Handler for editing player category (only allowed if not locked)
+  // Handler for editing player category UNLESS ITS LOCKED
   const handleChangeCategory = (playerId, newCategory) => {
     if (rosterLocked) return;
     fetch("http://localhost:3001/roster/category", {
@@ -137,8 +137,7 @@ function PlayerDashboardRoster() {
       .catch((error) => console.error("Error updating category:", error));
   };
 
-  // Handler to remove a player.
-  // This sends a POST request to the /roster/remove endpoint.
+  // Handle remove a player
   const handleRemovePlayer = (playerId) => {
     if (rosterLocked) return;
     fetch("http://localhost:3001/roster/remove", {
@@ -152,13 +151,13 @@ function PlayerDashboardRoster() {
         return res.json();
       })
       .then(() => {
-        // Refresh the roster to update the UI.
+
         fetchRoster(selectedDate);
       })
       .catch((error) => console.error("Error removing player:", error));
   };
 
-  // Save lineup handler with validations.
+  // Save lineup 
   const handleSaveLineup = () => {
     setErrorMsg("");
     if (starters.length !== 5) {
@@ -193,7 +192,7 @@ function PlayerDashboardRoster() {
       });
   };
 
-  // Date navigation handlers
+  // Date navigation 
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() - 1);
@@ -212,138 +211,256 @@ function PlayerDashboardRoster() {
     }
   };
 
-  if (loading) return <div>Loading roster...</div>;
+  if (loading) return <div className="bg-gray-900 text-gray-300 p-4 text-center">Loading roster...</div>;
 
   return (
-    <div className="roster-page">
+    <div className="bg-gray-900 min-h-screen font-sans p-4">
       <Header />
 
-      {/* League Info & Date Selection */}
-      <div className="date-section">
-        <div className="league-info">
-          <p>
-            Season: {seasonRange.season_start} to {seasonRange.season_end} <br />
-            League: {seasonRange.league_name}
-          </p>
+      {/* League Info/Date Selection */}
+      <div className="max-w-6xl mx-auto mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg">
+          <div className="text-gray-200">
+            <p>
+              <span className="font-semibold text-purple-300">Season:</span> {seasonRange.season_start} to {seasonRange.season_end} <br />
+              <span className="font-semibold text-purple-300">League:</span> {seasonRange.league_name}
+            </p>
+          </div>
+          {rosterLocked && (
+            <span className="text-red-400 font-semibold bg-red-900/20 py-1 px-3 rounded-md">
+              Roster is locked for this game (finalized).
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handlePrevDay} 
+              disabled={selectedDate === seasonRange.season_start}
+              className="px-3 py-1 bg-gray-700 rounded-md text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ◀
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              min={seasonRange.season_start}
+              max={seasonRange.season_end}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="py-1 px-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:border-purple-500 focus:outline-none"
+            />
+            <button 
+              onClick={handleNextDay} 
+              disabled={selectedDate === seasonRange.season_end}
+              className="px-3 py-1 bg-gray-700 rounded-md text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ▶
+            </button>
+          </div>
+          
         </div>
-        <div className="date-controls">
-          <button onClick={handlePrevDay} disabled={selectedDate === seasonRange.season_start}>◀</button>
-          <input
-            type="date"
-            value={selectedDate}
-            min={seasonRange.season_start}
-            max={seasonRange.season_end}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-          <button onClick={handleNextDay} disabled={selectedDate === seasonRange.season_end}>▶</button>
-        </div>
-        {rosterLocked && (
-          <span className="locked-message">
-            Roster is locked for this game (finalized).
-          </span>
-        )}
       </div>
 
       {/* Salary Cap Card */}
-      <div className="salary-cap-card card">
-        <p>
-          <strong>Salary Cap:</strong>
-          <span> (${payroll.toLocaleString()} / ${SALARY_CAP_RULES.totalBudget.toLocaleString()})</span>
-        </p>
-        <p><strong>Current Cap Stage:</strong> {capStage}</p>
-        <div className="salary-cap-bar">
-          <div
-            className="salary-cap-progress"
-            style={{
-              width: `${(payroll / SALARY_CAP_RULES.totalBudget) * 100}%`,
-              background: getCapColor(payroll),
-              height: "10px",
-              borderRadius: "5px"
-            }}
-          ></div>
+      <div className="max-w-6xl mx-auto mb-6 bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg">
+        <div className="mb-4">
+          <h3 className="text-xl font-bold mb-3 text-purple-400">Salary Cap Details</h3>
+          <div className="flex flex-col md:flex-row justify-between mb-2">
+            <p className="text-gray-200">
+              <span className="font-semibold text-purple-300">Salary Cap:</span>
+              <span> (${payroll.toLocaleString()} / ${SALARY_CAP_RULES.totalBudget.toLocaleString()})</span>
+            </p>
+            <p className="text-gray-200">
+              <span className="font-semibold text-purple-300">Current Cap Stage:</span> 
+              <span className={`ml-1 px-2 py-0.5 rounded ${
+                capStage === "Below Soft Cap" ? "bg-green-900/30 text-green-400" :
+                capStage === "Soft Cap" ? "bg-yellow-900/30 text-yellow-400" :
+                capStage === "First Apron" ? "bg-orange-900/30 text-orange-400" :
+                "bg-red-900/30 text-red-400"
+              }`}>
+                {capStage}
+              </span>
+            </p>
+          </div>
+          <div className="w-full h-4 bg-gray-700 rounded-lg overflow-hidden mt-2 relative">
+            {/* Add cap threshold markers */}
+            <div className="absolute top-0 bottom-0 border-l border-gray-300 border-dashed" 
+                 style={{ left: `${(SALARY_CAP_RULES.softCap / SALARY_CAP_RULES.totalBudget) * 100}%` }}></div>
+            <div className="absolute top-0 bottom-0 border-l border-gray-300 border-dashed" 
+                 style={{ left: `${(SALARY_CAP_RULES.firstApron / SALARY_CAP_RULES.totalBudget) * 100}%` }}></div>
+            <div className="absolute top-0 bottom-0 border-l border-gray-300 border-dashed" 
+                 style={{ left: `${(SALARY_CAP_RULES.hardCap / SALARY_CAP_RULES.totalBudget) * 100}%` }}></div>
+            <div
+              className={`h-full rounded-l-lg transition-all duration-300 ${getCapColor(payroll)}`}
+              style={{
+                width: `${(payroll / SALARY_CAP_RULES.totalBudget) * 100}%`
+              }}
+            ></div>
+          </div>
+          <div className="relative text-xs text-gray-400 mt-1">
+            <span className="absolute left-0">$0</span>
+            <span className="absolute" style={{ left: `${(SALARY_CAP_RULES.softCap / SALARY_CAP_RULES.totalBudget) * 100}%`, transform: 'translateX(-50%)' }}>Soft Cap</span>
+            <span className="absolute" style={{ left: `${(SALARY_CAP_RULES.firstApron / SALARY_CAP_RULES.totalBudget) * 100}%`, transform: 'translateX(-80%)' }}>First Apron</span>
+            <span className="absolute" style={{ left: `${(SALARY_CAP_RULES.hardCap / SALARY_CAP_RULES.totalBudget) * 100}%`, transform: 'translateX(-20%)' }}>Hard Cap</span>
+            <span className="absolute right-0">${SALARY_CAP_RULES.totalBudget.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="tax-breakdown">
-          <div>Tier 1: ${tier1Excess.toLocaleString()} taxed at 1.5× = ${tier1Tax.toLocaleString()}</div>
-          <div>Tier 2: ${tier2Excess.toLocaleString()} taxed at 2× = ${tier2Tax.toLocaleString()}</div>
-          <div>Tier 3: ${tier3Excess.toLocaleString()} taxed at 3× = ${tier3Tax.toLocaleString()}</div>
-          <div><strong>Total Tax Owed:</strong> ${totalTax.toLocaleString()}</div>
+        
+        <div className="mt-6 bg-gray-700/30 rounded-lg p-4">
+          <h4 className="text-lg font-semibold text-purple-300 mb-3">Luxury Tax Breakdown</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`p-3 rounded-lg border ${tier1Excess > 0 ? 'bg-green-900/20 border-green-700' : 'bg-gray-800/50 border-gray-700'}`}>
+              <div className="text-sm font-medium mb-1 text-gray-300">Tier 1 (1.5×)</div>
+              <div className="text-white mb-2 font-bold">${tier1Excess.toLocaleString()}</div>
+              <div className="text-sm flex justify-between">
+                <span className="text-gray-400">Tax:</span> 
+                <span className={`font-semibold ${tier1Tax > 0 ? 'text-green-400' : 'text-gray-500'}`}>${tier1Tax.toLocaleString()}</span>
+              </div>
+            </div>
+            
+            <div className={`p-3 rounded-lg border ${tier2Excess > 0 ? 'bg-yellow-900/20 border-yellow-700' : 'bg-gray-800/50 border-gray-700'}`}>
+              <div className="text-sm font-medium mb-1 text-gray-300">Tier 2 (2×)</div>
+              <div className="text-white mb-2 font-bold">${tier2Excess.toLocaleString()}</div>
+              <div className="text-sm flex justify-between">
+                <span className="text-gray-400">Tax:</span> 
+                <span className={`font-semibold ${tier2Tax > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>${tier2Tax.toLocaleString()}</span>
+              </div>
+            </div>
+            
+            <div className={`p-3 rounded-lg border ${tier3Excess > 0 ? 'bg-red-900/20 border-red-700' : 'bg-gray-800/50 border-gray-700'}`}>
+              <div className="text-sm font-medium mb-1 text-gray-300">Tier 3 (3×)</div>
+              <div className="text-white mb-2 font-bold">${tier3Excess.toLocaleString()}</div>
+              <div className="text-sm flex justify-between">
+                <span className="text-gray-400">Tax:</span> 
+                <span className={`font-semibold ${tier3Tax > 0 ? 'text-red-400' : 'text-gray-500'}`}>${tier3Tax.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 flex justify-between items-center p-3 bg-purple-900/30 rounded-lg border border-purple-700">
+            <span className="text-purple-300 font-semibold">Total Tax Owed:</span>
+            <span className="text-2xl font-bold text-white">${totalTax.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
       {/* Roster Sections */}
-      <div className="content-row">
-        <div className="left-column">
+      <div className="max-w-6xl mx-auto">
+        <div className="space-y-6">
           {/* Starters */}
-          <div className="roster-section card">
-            <h3>Starters (Max 5)</h3>
-            <ul>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg">
+            <h3 className="text-xl font-bold mb-4 text-purple-400">Starters (Max 5)</h3>
+            <ul className="space-y-2">
               {starters.length > 0 ? (
                 starters.map((player) => (
-                  <li key={player.player_id} className="player-item">
-                    <div className="player-info">
+                  <li key={player.player_id} className="flex justify-between items-center bg-gray-700/60 border border-gray-600 p-3 rounded-lg">
+                    <div className="text-gray-200">
                       <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
                     {!rosterLocked && (
-                      <div className="player-buttons">
-                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "reserve")}>DNP</button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                          className="py-1 px-3 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                        >
+                          REMOVE
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "bench")}
+                          className="py-1 px-3 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          BENCH
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                          className="py-1 px-3 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                        >
+                          DNP
+                        </button>
                       </div>
                     )}
                   </li>
                 ))
               ) : (
-                <li>No starters assigned</li>
+                <li className="text-gray-400 italic">No starters assigned</li>
               )}
             </ul>
           </div>
 
           {/* Bench */}
-          <div className="roster-section card">
-            <h3>Bench (Max 4)</h3>
-            <ul>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg">
+            <h3 className="text-xl font-bold mb-4 text-purple-400">Bench (Max 4)</h3>
+            <ul className="space-y-2">
               {bench.length > 0 ? (
                 bench.map((player) => (
-                  <li key={player.player_id} className="player-item">
-                    <div className="player-info">
+                  <li key={player.player_id} className="flex justify-between items-center bg-gray-700/60 border border-gray-600 p-3 rounded-lg">
+                    <div className="text-gray-200">
                       <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
                     {!rosterLocked && (
-                      <div className="player-buttons">
-                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "starter")}>START</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "reserve")}>DNP</button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                          className="py-1 px-3 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                        >
+                          REMOVE
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "starter")}
+                          className="py-1 px-3 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          START
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "reserve")}
+                          className="py-1 px-3 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                        >
+                          DNP
+                        </button>
                       </div>
                     )}
                   </li>
                 ))
               ) : (
-                <li>No bench players assigned</li>
+                <li className="text-gray-400 italic">No bench players assigned</li>
               )}
             </ul>
           </div>
 
           {/* Reserve */}
-          <div className="roster-section card">
-            <h3>DNP / Reserve (Max 6)</h3>
-            <ul>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg">
+            <h3 className="text-xl font-bold mb-4 text-purple-400">DNP / Reserve (Max 6)</h3>
+            <ul className="space-y-2">
               {reserve.length > 0 ? (
                 reserve.map((player) => (
-                  <li key={player.player_id} className="player-item">
-                    <div className="player-info">
+                  <li key={player.player_id} className="flex justify-between items-center bg-gray-700/60 border border-gray-600 p-3 rounded-lg">
+                    <div className="text-gray-200">
                       <strong>{player.player_name}</strong> ({player.pos}) - ${Number(player.salary).toLocaleString()}
                     </div>
                     {!rosterLocked && (
-                      <div className="player-buttons">
-                        <button onClick={() => handleRemovePlayer(player.player_id)}>REMOVE</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "bench")}>BENCH</button>
-                        <button onClick={() => handleChangeCategory(player.player_id, "starter")}>START</button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleRemovePlayer(player.player_id)}
+                          className="py-1 px-3 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                        >
+                          REMOVE
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "bench")}
+                          className="py-1 px-3 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          BENCH
+                        </button>
+                        <button 
+                          onClick={() => handleChangeCategory(player.player_id, "starter")}
+                          className="py-1 px-3 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                        >
+                          START
+                        </button>
                       </div>
                     )}
                   </li>
                 ))
               ) : (
-                <li>No reserve players assigned</li>
+                <li className="text-gray-400 italic">No reserve players assigned</li>
               )}
             </ul>
           </div>
@@ -352,13 +469,21 @@ function PlayerDashboardRoster() {
 
       {/* Save Lineup Button */}
       {!rosterLocked && (
-        <div className="lineup-buttons">
-          <button className="save-btn" onClick={handleSaveLineup}>
+        <div className="max-w-6xl mx-auto mt-6 text-center">
+          <button 
+            className="py-2.5 px-6 text-base font-semibold text-white bg-purple-600 border-none rounded-lg cursor-pointer shadow-md transition-all duration-200 hover:translate-y-[-2px] hover:shadow-purple-900/50 hover:bg-purple-700"
+            onClick={handleSaveLineup}
+          >
             Save Lineup
           </button>
         </div>
       )}
-      {errorMsg && <div className="error-message">{errorMsg}</div>}
+      {errorMsg && (
+        <div className="max-w-6xl mx-auto mt-4 text-center text-red-500 p-3 bg-red-900/20 rounded-lg">
+          {errorMsg}
+        </div>
+      )}
+      
     </div>
   );
 }

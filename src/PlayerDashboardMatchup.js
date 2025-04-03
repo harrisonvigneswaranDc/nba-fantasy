@@ -3,7 +3,6 @@ import "./PlayerDashboardMatchup.css";
 import Header from "./Header";
 
 function PlayerDashboardMatchup() {
-  // State variables
   const [data, setData] = useState(null);
   const [seasonRange, setSeasonRange] = useState({
     season_start: "",
@@ -18,14 +17,12 @@ function PlayerDashboardMatchup() {
   const [gamesPlayedTeamA, setGamesPlayedTeamA] = useState([]);
   const [gamesPlayedTeamB, setGamesPlayedTeamB] = useState([]);
 
-  // Refs for tracking updates and previous date
+
   const lastUpdatedDateRef = useRef("");
   const initialLoadRef = useRef(true);
   const prevSelectedDateRef = useRef("");
-  // Flag to ensure daily score is added only once when navigating forward
   const hasAddedDailyScoreRef = useRef(false);
 
-  // Helper: Calculate fantasy points for a player
   const calculateFantasyPoints = (stats) => {
     const pts = Number(stats.pts) || 0;
     const reb = Number(stats.reb) || 0;
@@ -35,7 +32,7 @@ function PlayerDashboardMatchup() {
     return pts + reb * 1.2 + ast * 1.5 + stl * 3 + blk * 3;
   };
 
-  // Helper: Sum total score from an array of game stats
+  // Sum total score from an array of game stats
   const totalScore = (gamesArray) =>
     gamesArray.reduce((acc, curr) => acc + calculateFantasyPoints(curr), 0);
 
@@ -74,7 +71,7 @@ function PlayerDashboardMatchup() {
     fetchLeagueInfo();
   }, []);
 
-  // Fetch matchup data, rosters, and games for the selected date
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -92,7 +89,7 @@ function PlayerDashboardMatchup() {
         if (!res.ok) throw new Error("Network response not ok");
         const jsonData = await res.json();
 
-        if (isCancelled) return; // Prevent state updates if unmounted
+        if (isCancelled) return; 
 
         setData(jsonData);
 
@@ -136,7 +133,7 @@ function PlayerDashboardMatchup() {
     };
   }, [selectedDate]);
 
-  // Helper functions to fetch roster and games played data
+
   const fetchRoster = async (date, teamId) => {
     try {
       const response = await fetch(
@@ -170,7 +167,6 @@ function PlayerDashboardMatchup() {
   };
 
   // Update matchup score when the date changes.
-  // If navigating backward, subtract daily scores; if forward, add daily scores only once.
   useEffect(() => {
     const updateAndFetchScore = async () => {
       if (!selectedDate || !data?.matchup) return;
@@ -241,7 +237,7 @@ function PlayerDashboardMatchup() {
           throw new Error("Failed to update score");
         }
 
-        // Optimistically update the local state with the new overall scores
+        // Update the local state with the new overall scores
         setData((prevData) => {
           if (!prevData?.matchup) return prevData;
           return {
@@ -258,7 +254,7 @@ function PlayerDashboardMatchup() {
       } catch (error) {
         console.error("Error updating matchup score:", error);
         setError("Error updating score");
-        // Optionally clear the ref to allow retrying:
+    
         lastUpdatedDateRef.current = "";
       }
     };
@@ -280,10 +276,10 @@ function PlayerDashboardMatchup() {
     const rows = [];
 
     rows.push(
-      <tr className="section-label" key={`${categoryLabel}-header`}>
-        <td colSpan="8">{categoryLabel.toUpperCase()}</td>
-        <td className="middle-col">|</td>
-        <td colSpan="8">{categoryLabel.toUpperCase()}</td>
+      <tr key={`${categoryLabel}-header`} className="bg-purple-900/30 font-semibold text-center">
+        <td colSpan="8" className="py-3 px-4 text-purple-300 rounded-l-lg">{categoryLabel.toUpperCase()}</td>
+        <td className="bg-gray-800 text-gray-500 text-center font-bold">|</td>
+        <td colSpan="8" className="py-3 px-4 text-purple-300 rounded-r-lg">{categoryLabel.toUpperCase()}</td>
       </tr>
     );
 
@@ -294,32 +290,62 @@ function PlayerDashboardMatchup() {
       const statsB = gamesB.find((game) => game.player_id === playerB?.player_id);
 
       rows.push(
-        <tr key={`${categoryLabel}-row-${i}`}>
+        <tr key={`${categoryLabel}-row-${i}`} className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors">
           {playerA ? (
             <>
-              <td>{playerA.pos}</td>
-              <td>{playerA.player_name}</td>
-              <td>{statsA ? calculateFantasyPoints(statsA).toFixed(2) : "-"}</td>
-              <td>{statsA ? statsA.pts : "-"}</td>
-              <td>{statsA ? statsA.reb : "-"}</td>
-              <td>{statsA ? statsA.ast : "-"}</td>
-              <td>{statsA ? statsA.stl : "-"}</td>
-              <td>{statsA ? statsA.blk : "-"}</td>
+              <td className="py-2 px-3 text-gray-300">{playerA.pos}</td>
+              <td className={`py-2 px-3 text-gray-200 font-medium ${statsA ? 'flex items-center' : ''}`}>
+                {statsA && <span className="w-2 h-2 rounded-full bg-purple-500 mr-2 inline-block"></span>}
+                {playerA.player_name}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? calculateFantasyPoints(statsA).toFixed(2) : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? statsA.pts : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? statsA.reb : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? statsA.ast : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? statsA.stl : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsA ? 'text-purple-300 font-medium' : 'text-gray-300'}`}>
+                {statsA ? statsA.blk : "-"}
+              </td>
             </>
           ) : (
             <td colSpan="8"></td>
           )}
-          <td className="middle-col">|</td>
+          <td className="bg-gray-800 text-gray-500 text-center font-bold">|</td>
           {playerB ? (
             <>
-              <td>{playerB.pos}</td>
-              <td>{playerB.player_name}</td>
-              <td>{statsB ? calculateFantasyPoints(statsB).toFixed(2) : "-"}</td>
-              <td>{statsB ? statsB.pts : "-"}</td>
-              <td>{statsB ? statsB.reb : "-"}</td>
-              <td>{statsB ? statsB.ast : "-"}</td>
-              <td>{statsB ? statsB.stl : "-"}</td>
-              <td>{statsB ? statsB.blk : "-"}</td>
+              <td className="py-2 px-3 text-gray-300">{playerB.pos}</td>
+              <td className={`py-2 px-3 text-gray-200 font-medium ${statsB ? 'flex items-center' : ''}`}>
+                {statsB && <span className="w-2 h-2 rounded-full bg-teal-500 mr-2 inline-block"></span>}
+                {playerB.player_name}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? calculateFantasyPoints(statsB).toFixed(2) : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? statsB.pts : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? statsB.reb : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? statsB.ast : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? statsB.stl : "-"}
+              </td>
+              <td className={`py-2 px-3 ${statsB ? 'text-teal-300 font-medium' : 'text-gray-300'}`}>
+                {statsB ? statsB.blk : "-"}
+              </td>
             </>
           ) : (
             <td colSpan="8"></td>
@@ -331,7 +357,7 @@ function PlayerDashboardMatchup() {
     return rows;
   };
 
-  // Date navigation handlers
+
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() - 1);
@@ -346,110 +372,165 @@ function PlayerDashboardMatchup() {
     if (nextStr <= seasonRange.season_end) setSelectedDate(nextStr);
   };
 
-  if (loading) return <div>Loading matchup data...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!data || !data.matchup) return <div>No matchup data available.</div>;
-  if (!selectedDate) return <div>No date selected.</div>;
+  if (loading) return <div className="bg-gray-900 text-gray-300 p-4 text-center">Loading matchup data...</div>;
+  if (error) return <div className="bg-gray-900 text-red-400 p-4 text-center">Error: {error}</div>;
+  if (!data || !data.matchup) return <div className="bg-gray-900 text-gray-300 p-4 text-center">No matchup data available.</div>;
+  if (!selectedDate) return <div className="bg-gray-900 text-gray-300 p-4 text-center">No date selected.</div>;
 
   const { matchup } = data;
   const teamACategories = categorizePlayers(rosterA);
   const teamBCategories = categorizePlayers(rosterB);
 
   return (
-    <div className="matchup-page">
+    <div className="bg-gray-900 min-h-screen font-sans p-4">
       <Header />
-      <div className="league-info">
-        <p>
-          Season: {seasonRange.season_start} to {seasonRange.season_end}
-          <br />
-          League: {seasonRange.league_name}
-        </p>
-      </div>
+      
+      <div className="max-w-6xl mx-auto">
+        {/* League */}
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6 text-gray-300">
+          <p>
+            <span className="font-semibold text-purple-300">Season:</span> {seasonRange.season_start} to {seasonRange.season_end}
+            <br />
+            <span className="font-semibold text-purple-300">League:</span> {seasonRange.league_name}
+          </p>
+        </div>
 
-      {/* Team Header Section */}
-      <div className="team-header">
-        <div className="team-header-left">
-          <div className="team-name">
-            {matchup.teamA_name || matchup.teama_name} (Score:{" "}
-            {Number(matchup.team_a_score).toFixed(2)} | Today's:{" "}
-            {totalScore(gamesPlayedTeamA).toFixed(2)})
+        {/* Team Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg w-full md:w-auto">
+            <div className="text-lg font-semibold text-purple-400">
+              {matchup.teamA_name || matchup.teama_name}
+              <span className="text-gray-300 text-base ml-2">
+                (Score: <span className="text-white font-medium">{Number(matchup.team_a_score).toFixed(2)}</span> | 
+                Today's: <span className="text-white font-medium">{totalScore(gamesPlayedTeamA).toFixed(2)}</span>)
+              </span>
+            </div>
+          </div>
+          
+          <div className="text-xl font-bold text-gray-500">VS</div>
+          
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg w-full md:w-auto">
+            <div className="text-lg font-semibold text-purple-400">
+              {matchup.teamB_name || matchup.teamb_name}
+              <span className="text-gray-300 text-base ml-2">
+                (Score: <span className="text-white font-medium">{Number(matchup.team_b_score).toFixed(2)}</span> | 
+                Today's: <span className="text-white font-medium">{totalScore(gamesPlayedTeamB).toFixed(2)}</span>)
+              </span>
+            </div>
           </div>
         </div>
-        <div className="team-header-right">
-          <div className="team-name">
-            {matchup.teamB_name || matchup.teamb_name} (Score:{" "}
-            {Number(matchup.team_b_score).toFixed(2)} | Today's:{" "}
-            {totalScore(gamesPlayedTeamB).toFixed(2)})
+
+        {/* Score Visualization Bar */}
+        <div className="bg-gray-800 border border-gray-700 rounded-lg h-8 mb-6 overflow-hidden shadow-lg relative">
+
+          {(() => {
+            const teamAScore = Number(matchup.team_a_score) || 0;
+            const teamBScore = Number(matchup.team_b_score) || 0;
+            const totalScore = teamAScore + teamBScore;
+            const teamAPercentage = totalScore > 0 ? (teamAScore / totalScore) * 100 : 50;
+            
+            return (
+              <>
+                <div 
+                  className="absolute top-0 left-0 h-full bg-purple-600 transition-all duration-500"
+                  style={{ width: `${teamAPercentage}%` }}
+                >
+                  {teamAPercentage > 15 && (
+                    <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white text-xs font-bold">
+                      {teamAScore.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <div 
+                  className="absolute top-0 right-0 h-full bg-teal-500 transition-all duration-500"
+                  style={{ width: `${100 - teamAPercentage}%` }}
+                >
+                  {(100 - teamAPercentage) > 15 && (
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-white text-xs font-bold">
+                      {teamBScore.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+          <div className="absolute top-0 left-0 w-full h-full flex justify-center items-center z-10">
+            <div className="h-full w-px bg-gray-900"></div>
           </div>
         </div>
-      </div>
 
-      {/* Date Navigation */}
-      <div className="date-nav">
-        <button
-          onClick={handlePrevDay}
-          disabled={selectedDate === seasonRange.season_start}
-        >
-          Prev Day
-        </button>
-        <span>{selectedDate}</span>
-        <button
-          onClick={handleNextDay}
-          disabled={selectedDate === seasonRange.season_end}
-        >
-          Next Day
-        </button>
-      </div>
+        {/* Date Navigation */}
+        <div className="flex justify-center items-center gap-4 mb-6">
+          <button
+            onClick={handlePrevDay}
+            disabled={selectedDate === seasonRange.season_start}
+            className="px-4 py-2 bg-gray-800 text-white rounded-md border border-gray-700 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Prev Day
+          </button>
+          <span className="text-gray-200 font-semibold px-3 py-2 bg-gray-800/50 rounded-md border border-gray-700">
+            {selectedDate}
+          </span>
+          <button
+            onClick={handleNextDay}
+            disabled={selectedDate === seasonRange.season_end}
+            className="px-4 py-2 bg-gray-800 text-white rounded-md border border-gray-700 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next Day
+          </button>
+        </div>
 
-      {/* Matchup Table */}
-      <div className="matchup-table-container">
-        <table className="matchup-table">
-          <thead>
-            <tr>
-              <th>Pos</th>
-              <th>Player</th>
-              <th>CurrPts</th>
-              <th>PTS</th>
-              <th>REB</th>
-              <th>AST</th>
-              <th>ST</th>
-              <th>BLK</th>
-              <th className="middle-col">|</th>
-              <th>Pos</th>
-              <th>Player</th>
-              <th>CurrPts</th>
-              <th>PTS</th>
-              <th>REB</th>
-              <th>AST</th>
-              <th>ST</th>
-              <th>BLK</th>
-            </tr>
-          </thead>
-          <tbody>
-            {renderCategoryRows(
-              "Starters",
-              teamACategories.starters,
-              teamBCategories.starters,
-              gamesPlayedTeamA,
-              gamesPlayedTeamB
-            )}
-            {renderCategoryRows(
-              "Bench",
-              teamACategories.bench,
-              teamBCategories.bench,
-              gamesPlayedTeamA,
-              gamesPlayedTeamB
-            )}
-            {renderCategoryRows(
-              "DNP",
-              teamACategories.reserve,
-              teamBCategories.reserve,
-              gamesPlayedTeamA,
-              gamesPlayedTeamB
-            )}
-          </tbody>
-        </table>
+        {/* Matchup Table */}
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-lg overflow-x-auto">
+          <table className="w-full min-w-[1000px] border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-800/90 border-b border-gray-700">
+                <th className="p-3 text-left text-gray-300 font-semibold">Pos</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">Player</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">CurrPts</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">PTS</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">REB</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">AST</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">ST</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">BLK</th>
+                <th className="bg-gray-800 text-gray-500 text-center font-bold">|</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">Pos</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">Player</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">CurrPts</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">PTS</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">REB</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">AST</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">ST</th>
+                <th className="p-3 text-left text-gray-300 font-semibold">BLK</th>
+              </tr>
+            </thead>
+            <tbody>
+              {renderCategoryRows(
+                "Starters",
+                teamACategories.starters,
+                teamBCategories.starters,
+                gamesPlayedTeamA,
+                gamesPlayedTeamB
+              )}
+              {renderCategoryRows(
+                "Bench",
+                teamACategories.bench,
+                teamBCategories.bench,
+                gamesPlayedTeamA,
+                gamesPlayedTeamB
+              )}
+              {renderCategoryRows(
+                "DNP",
+                teamACategories.reserve,
+                teamBCategories.reserve,
+                gamesPlayedTeamA,
+                gamesPlayedTeamB
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+      
     </div>
   );
 }
