@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom"; 
 
-
-// shuffle an array (Fisher-Yates)
+// Helper function to shuffle an array (Fisher-Yates)
 const shuffleArray = (array) => {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -12,16 +11,16 @@ const shuffleArray = (array) => {
   return copy;
 };
 
-// Salary Cap Rules Configuration 
+// Salary Cap Rules Configuration (values in dollars)
 const SALARY_CAP_RULES = {
-  salaryFloor: 126000000,   
-  softCap: 140000000,       
-  firstApron: 178000000,    
-  hardCap: 189000000,       
-  totalBudget: 300000000    
+  salaryFloor: 126000000,   // $126M
+  softCap: 140000000,       // $140M
+  firstApron: 178000000,    // $178M
+  hardCap: 189000000,       // $189M (Second Apron / Hard Cap)
+  totalBudget: 300000000    // Overall team budget
 };
 
-// current cap stage based on payroll
+// Helper function to indicate the current cap stage based on payroll
 const getCapStage = (payroll) => {
   if (payroll <= SALARY_CAP_RULES.softCap) {
     return "Below Soft Cap";
@@ -36,7 +35,7 @@ const getCapStage = (payroll) => {
 
 const PracticeFantasyDraft = () => {
   const TOTAL_ROUNDS = 15;
-  const TIME_LIMIT = 30; 
+  const TIME_LIMIT = 10; // seconds for each pick
 
   // Draft state variables
   const [currentRound, setCurrentRound] = useState(1);
@@ -64,7 +63,7 @@ const PracticeFantasyDraft = () => {
   // Pick history state
   const [pickHistory, setPickHistory] = useState([]);
 
-  // States for final pick phase 
+  // States for final pick phase (for users who missed all rounds)
   const [finalPickPhase, setFinalPickPhase] = useState(false);
   const [finalPickQueue, setFinalPickQueue] = useState([]);
 
@@ -83,21 +82,21 @@ const PracticeFantasyDraft = () => {
           stls: player.STL,
           blks: player.BLK,
           tvs: player.TVS || 0,
-          salary: player.Salary, 
+          salary: player.Salary, // Salary in dollars
         }));
         setAllPlayers(formattedData);
       })
       .catch((error) => console.error("Error loading players:", error));
   }, []);
 
-  // Update players list 
+  // Update players list (for display) once the draft hasn't started.
   useEffect(() => {
     if (!isDraftStarted && allPlayers.length > 0) {
       setPlayers(allPlayers);
     }
   }, [allPlayers, isDraftStarted]);
 
-  // Filter players by search query 
+  // Filter players by search query (by name or position)
   const filteredPlayers = useMemo(() => {
     return players.filter((player) =>
       player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,14 +121,15 @@ const PracticeFantasyDraft = () => {
     return sorted;
   }, [filteredPlayers, sortCriteria]);
 
-  // Determine available players based on the current drafting team and cap stage
+  // --- Restrict Available Players in Second Apron ---
+  // If the drafting team is in "Second Apron (Hard Cap)", only show players worth <= $5M.
   const currentDraftingTeamUsed = teamSalaryCaps[draftingTeam]?.used || 0;
   const currentDraftingTeamStage = getCapStage(currentDraftingTeamUsed);
   const availablePlayers = 
     currentDraftingTeamStage === "Second Apron (Hard Cap)"
       ? sortedPlayers.filter(player => player.salary <= 5000000)
       : sortedPlayers;
-  
+  // ---------------------------------------------------
 
   // Timer logic for draft countdown
   useEffect(() => {
@@ -169,7 +169,7 @@ const PracticeFantasyDraft = () => {
     }
   };
 
-  // When a player is picked manually 
+  // When a player is picked manually during the main draft.
   const pickPlayer = (playerName) => {
     if (!isDraftStarted) return;
     const currentParticipant = participants[currentPickerIndex];
@@ -282,7 +282,7 @@ const PracticeFantasyDraft = () => {
     });
   };
 
-  //  trigger final pick phase if any participant never picked.
+  // End the main draft; trigger final pick phase if any participant never picked.
   const endDraft = () => {
     const emptyRosters = participants.filter((p) => rosters[p].length === 0);
     if (emptyRosters.length > 0) {
@@ -296,7 +296,7 @@ const PracticeFantasyDraft = () => {
     }
   };
 
-  
+  // For displaying team rosters, allow cycling through teams.
   const [currentTeamIndex, setCurrentTeamIndex] = useState(0);
   const handleNextTeam = () => {
     const teamNames = Object.keys(rosters);
@@ -309,33 +309,33 @@ const PracticeFantasyDraft = () => {
   const currentTeamSalaryCap =
     teamSalaryCaps[currentTeamName] || { used: 0, totalBudget: SALARY_CAP_RULES.totalBudget };
 
-
+  // --- Existing Payroll & Tax Calculations (Tiered) ---
   const payroll = currentTeamSalaryCap.used; // current team's payroll  
   const softCap = SALARY_CAP_RULES.softCap;      // $140M  
   const firstApron = SALARY_CAP_RULES.firstApron;  // $178M  
   const secondApron = SALARY_CAP_RULES.hardCap;    // $189M  
 
-  // Tier 1: Max taxable excess capped at $31M 
+  // Tier 1: Max taxable excess capped at $31M (with multiplier 1.5×)
   const tier1Excess = payroll > softCap ? Math.min(payroll - softCap, 31000000) : 0;
   const tier1Tax = tier1Excess * 1.5;
 
-  // Tier 2: Applies from $178M to $189M 
+  // Tier 2: Applies from $178M to $189M (max $11M taxable with multiplier 2×)
   const tier2Excess = payroll > firstApron ? Math.min(payroll - firstApron, 11000000) : 0;
   const tier2Tax = tier2Excess * 2;
 
-  // Tier 3: Applies for payroll above $189M 
+  // Tier 3: Applies for payroll above $189M (multiplier 3×)
   const tier3Excess = payroll > secondApron ? payroll - secondApron : 0;
   const tier3Tax = tier3Excess * 3;
 
   const totalTax = tier1Tax + tier2Tax + tier3Tax;
-
+  // ---------------------------------------------------
 
   // For splitting the team's roster into groups:
   const starters = currentRoster.slice(0, 5);
   const bench = currentRoster.slice(5, 9);
   const dnp = currentRoster.slice(9, 15);
 
-  // initializes participants, rosters, and salary caps.
+  // Start Draft Handler: initializes participants, rosters, and salary caps.
   const handleStartDraft = () => {
     const namesToExclude = ["Sarah", "You", "Michael", "Samantha"];
     setPlayers(allPlayers.filter((player) => !namesToExclude.includes(player.name)));
@@ -371,6 +371,7 @@ const PracticeFantasyDraft = () => {
     if (timerPercentage > 33) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
 
   return (
     <div className="max-w-7xl mx-auto p-5 bg-gray-900 rounded-lg shadow-md text-gray-200">

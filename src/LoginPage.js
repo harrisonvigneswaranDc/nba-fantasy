@@ -1,9 +1,13 @@
+// Import React and useState
 import React, { useState } from 'react';
+
+// Import useNavigate from react-router-dom for navigation
 import { useNavigate } from 'react-router-dom';
 import Header from "./Header";
 
+// Import the Header component
 function LoginPage() {
-  
+  // Define state variables for username, password, and any errors 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,6 +29,7 @@ function LoginPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include", 
+      // Convert username and password into a JSON string
       body: JSON.stringify({ username, password }),
     })
       .then((response) => {
@@ -38,7 +43,7 @@ function LoginPage() {
         console.log("Login successful:", data);
         
 
-       
+       // navigate when login is successful
         navigate("/player-dashboard");
       })
       .catch((error) => {
@@ -47,8 +52,10 @@ function LoginPage() {
       });
   };
 
+  //render the login page
   return (
     <div className="bg-gray-900 min-h-screen">
+      {/* Render the header component */}
       <Header />
       <div className="flex justify-center items-center min-h-[calc(100vh-80px)] px-4">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-8 w-full max-w-md shadow-lg hover:shadow-purple-900/20 transition-all duration-300">

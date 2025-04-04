@@ -1,7 +1,12 @@
+
+// Import React and other necessary libraries
 import React from "react";
 import { Link } from "react-router-dom"; 
+
+// Import the Header component
 import Header from "./Header";
 
+// Define the HomePage 
 function HomePage() {
   return (
     <div className="font-sans bg-gray-900 min-h-screen flex flex-col text-gray-200">
@@ -60,7 +65,7 @@ function HomePage() {
               </div>
             </div>
           </section>
-
+          {/* Section for practicing the fantasy draft */}
           <section className="flex-1 bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-purple-900/60 transition-all duration-300">
             <h2 className="text-xl font-bold text-purple-400 mb-3">Practice Your Fantasy Draft</h2>
             <p className="text-gray-400 italic mb-4">Test your drafting skills and strategies before the real thing!</p>

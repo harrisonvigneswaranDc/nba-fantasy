@@ -1,14 +1,19 @@
+// Import React and other necessary libraries
 import React, { useEffect, useRef, useState } from "react";
 import "./PlayerDashboardMatchup.css";
+//import header component
 import Header from "./Header";
 
 function PlayerDashboardMatchup() {
+  // State to hold the fetched matchups and rosters
   const [data, setData] = useState(null);
   const [seasonRange, setSeasonRange] = useState({
+    // State for league season details and league name
     season_start: "",
     season_end: "",
     league_name: "",
   });
+  // State for selected date, loading status, error messages, and rosters
   const [selectedDate, setSelectedDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -17,7 +22,7 @@ function PlayerDashboardMatchup() {
   const [gamesPlayedTeamA, setGamesPlayedTeamA] = useState([]);
   const [gamesPlayedTeamB, setGamesPlayedTeamB] = useState([]);
 
-
+// Refs to track the last updated date, initial load, previous selected date, and if daily score has been added
   const lastUpdatedDateRef = useRef("");
   const initialLoadRef = useRef(true);
   const prevSelectedDateRef = useRef("");
@@ -51,6 +56,7 @@ function PlayerDashboardMatchup() {
         });
         if (!res.ok) throw new Error("Network response not ok");
         const leagueInfo = await res.json();
+        // Set the season range using the fetched dates (formatted as YYYY-MM-DD)
         setSeasonRange({
           season_start: new Date(leagueInfo.season_start)
             .toISOString()
@@ -61,6 +67,7 @@ function PlayerDashboardMatchup() {
           league_name: leagueInfo.league_name,
         });
         setSelectedDate(
+          //selected date to the season start date
           new Date(leagueInfo.season_start).toISOString().slice(0, 10)
         );
       } catch (err) {
@@ -505,6 +512,7 @@ function PlayerDashboardMatchup() {
               </tr>
             </thead>
             <tbody>
+              {/* Render rows for each player category */}
               {renderCategoryRows(
                 "Starters",
                 teamACategories.starters,

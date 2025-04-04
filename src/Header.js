@@ -1,13 +1,21 @@
+//import react, useState for state management and useEffect
 import React, { useEffect, useState } from 'react';
+
+// Import Link for navigation and useNavigate hook for routing
 import { Link, useNavigate } from 'react-router-dom';
 
+// define the Header component
 const Header = () => {
+  // State to manage user authentication status
   const [user, setUser] = useState(null);
+  
   const navigate = useNavigate();
 
+  // Fetch the current user profile 
   useEffect(() => {
     const fetchCurrentUser = async (retryCount = 0) => {
       try {
+        // Make a fetch request to the backend profile endpoint
         const res = await fetch(`http://localhost:3001/profile`, {
           credentials: 'include'
         });
@@ -29,7 +37,9 @@ const Header = () => {
     fetchCurrentUser();
   }, []);
 
+// Function to handle user logout
   const handleLogout = () => {
+    // Send a request to the backend logout endpoint
     fetch("http://localhost:3001/logout", {
       method: "POST",
       credentials: "include",
@@ -48,6 +58,7 @@ const Header = () => {
       });
   };
 
+  // Render the header with navigation links and user info
   return (
     <header className="bg-gray-900 border-b border-gray-700 px-4 py-3 text-gray-200 shadow-md">
       <div className="container mx-auto">
@@ -61,7 +72,9 @@ const Header = () => {
           
           {/* nav links */}
           <div className="hidden md:flex space-x-6">
+            {/* Home link always visible */}
             <Link className="text-gray-300 hover:text-purple-400 transition-colors duration-200" to="/">Home</Link>
+             {/* if logged in it renders link */}
             {user && (
               <>
                 <Link className="text-gray-300 hover:text-purple-400 transition-colors duration-200" to="/player-dashboard">Dashboard</Link>

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import Header from "./Header";
 
 function FreeAgents() {
@@ -10,10 +9,27 @@ function FreeAgents() {
   const [sortType, setSortType] = useState("");
   const [positionFilter, setPositionFilter] = useState("");
   const [error, setError] = useState("");
+  const [teamInfo, setTeamInfo] = useState(null);
 
+  // Fetch team info including current team salary and team id
+  useEffect(() => {
+    fetch("http://localhost:3001/team-info", { credentials: "include" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Error fetching team info");
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setTeamInfo(data);
+      })
+      .catch((err) => {
+        console.error("Error fetching team info:", err);
+        setError("Error fetching team info");
+      });
+  }, []);
 
-  const userTeamId = 1; 
-
+  // Fetch free agents
   useEffect(() => {
     fetch("http://localhost:3001/freeagents", { credentials: "include" })
       .then((response) => {
@@ -28,21 +44,22 @@ function FreeAgents() {
       );
   }, []);
 
+  // Filter players based on search query 
   const filteredPlayers = players.filter((player) =>
     player.player.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Filter players based on position
   const filteredByPosition = filteredPlayers.filter((player) => {
     if (!positionFilter) return true;
     return player.pos === positionFilter;
   });
 
-
+  // Sort players based on the selected stat
   const sortedPlayers = filteredByPosition.sort((a, b) => {
     if (!sortType) return 0;
     return b[sortType] - a[sortType];
   });
-
 
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
@@ -83,23 +100,47 @@ function FreeAgents() {
     setCurrentPage(1);
   };
 
-
+  // Updated function to add a free agent using dynamic team id and team salary cap checks
   const handleAddFreeAgent = async (player) => {
     try {
-
       let contractAmount = Number(player.salary);
-      if (contractAmount >= 178000000) {
-        contractAmount = 5000000;
+
+      // Ensure teamInfo has been fetched before proceeding
+      if (!teamInfo || !teamInfo.myTeam) {
+        alert("Team information is not yet available. Please try again later.");
+        return;
+      }
+
+      // Get the dynamic team id from teamInfo
+      const userTeamId = teamInfo.myTeam.team_id;
+      // Convert team_salary (which might be a string) to a number
+      const currentTeamSalary = Number(teamInfo.myTeam.team_salary);
+
+      // Check the team salary cap rules
+      if (currentTeamSalary <= 170000000) {
+        // Adding the player's contract should not push the total above 170M.
+        if (currentTeamSalary + contractAmount > 170000000) {
+          alert(
+            "Adding this player would exceed the 170M cap. Please choose a lower contract amount."
+          );
+          return;
+        }
+      } else {
+        // If the team is already above 170M, only allow players with a contract of 5M or less.
+        if (contractAmount > 5000000) {
+          alert(
+            "Your team salary is already over 170M. You can only add players with a contract of 5M or less."
+          );
+          return;
+        }
       }
 
       const payload = {
         team_id: userTeamId,
         player_id: player.player_id,
         contract_amount: contractAmount,
-
         category: "reserve"
       };
-
 
       const updateRes = await fetch("http://localhost:3001/update-roster", {
         method: "POST",
@@ -114,19 +155,16 @@ function FreeAgents() {
       }
 
       alert("Player added successfully!");
- 
+
     } catch (err) {
       console.error("Error adding free agent:", err);
       alert("Error adding free agent: " + err.message);
     }
   };
 
-
   return (
     <div className="bg-gray-900 min-h-screen font-sans p-4">
       <Header />
-
-
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <input
@@ -166,7 +204,7 @@ function FreeAgents() {
           </button>
         </div>
 
-
+        {/* Table displaying free agents data */}
         <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-x-auto mb-4 shadow-lg">
           <table className="w-full min-w-[700px]">
             <thead>
@@ -216,7 +254,6 @@ function FreeAgents() {
           </table>
         </div>
 
-
         <div className="flex justify-center gap-4 mb-6">
           <button
             className="px-4 py-2 bg-gray-800 text-white rounded-md border border-gray-700 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800 transition-colors shadow-md"
@@ -234,22 +271,14 @@ function FreeAgents() {
           </button>
         </div>
 
-
         <div className="max-w-6xl mx-auto bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-gray-300">
-          <p className="text-purple-400 font-bold mb-2">
-            WHEN ADDING A PLAYER:
-          </p>
+          <p className="text-purple-400 font-bold mb-2">WHEN ADDING A PLAYER:</p>
           <ul className="list-disc pl-6 space-y-1">
-            <li>
-              If the roster is full, a pop-up appears with "Select a player to drop."
-            </li>
-            <li>
-              If any rules (e.g. salary cap or roster size) are violated, a warning is shown.
-            </li>
+            <li>If the roster is full you would need to drop a player.</li>
+            <li>You need to make sure that money, exception and rules all match up.</li>
           </ul>
         </div>
       </div>
-      
     </div>
   );
 }
